@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8fb217" />
+    <!-- Interne Anwendung: gehört nicht in Suchmaschinen. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta
+      name="description"
+      content="Portal des EC-Nordbund für Freizeitleiter und Ortsverantwortliche"
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>EC-Nordbund Portal</title>
+  </head>
+  <body>
+    <div id="app">Lädt …</div>
+    <!--
+      Globaler Download-Anker. Ein <a download> muss im Dokument hängen, damit
+      .click() in allen Browsern greift; tnList.ts und die CSV-Exporte holen
+      ihn über #ec-download.
+    -->
+    <a id="ec-download" style="display: none"></a>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
