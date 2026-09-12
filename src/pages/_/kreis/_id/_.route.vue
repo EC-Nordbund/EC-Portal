@@ -1,198 +1,61 @@
 <template lang="pug">
 ec-wrapper(
-  :title='daten ? daten.kreis.bezeichnung : "EC-Kreis"',
-  subTitle='Führungszeugnisse',
-  hasHeader,
-  hasReload,
-  @reload='laden'
+  :title='kreis ? kreis.bezeichnung : "EC-Kreis"',
+  :subTitle='untertitel',
+  hasNav,
+  hasRouterView,
+  :nav='nav'
 )
-  template(#header)
-    .d-flex.align-center.flex-wrap.ga-4.px-4.pb-2
-      ec-search(label='Person suchen', @suche='suche = $event')
-      v-btn-toggle(v-model='ansicht', density='compact', mandatory, variant='outlined')
-        v-btn(value='ampel', size='small') Relevante
-        v-btn(value='alle', size='small') Alle Personen
-      v-spacer
-      v-btn(
-        variant='text',
-        size='small',
-        prepend-icon='download',
-        :disabled='!gefiltert.length',
-        @click='csv'
-      ) CSV
-
-  v-progress-linear(v-if='laedtGerade', indeterminate, color='primary')
-
-  v-alert.ma-4(
-    v-if='daten && !gefiltert.length',
-    type='info',
-    variant='tonal'
-  ) Keine Personen in dieser Ansicht.
-
-  v-table(v-if='gefiltert.length', density='compact', hover)
-    thead
-      tr
-        th Status
-        th Name
-        th Geburtstag
-        th FZ vom
-        th Gültig bis
-        th Anträge
-        th Kontakt
-        th
-    tbody
-      tr(v-for='p in gefiltert', :key='p.personID')
-        td
-          ec-ampel(:farbe='p.farbe')
-        td
-          | {{ p.vorname }} {{ p.nachname }}
-          v-chip.ml-2(v-if='p.fzDeaktiviert', size='x-small', variant='outlined') ausgenommen
-        td {{ p.gebDat ? p.gebDat.german : '—' }}
-        td {{ p.fzVon ? p.fzVon.german : '—' }}
-        td {{ p.gueltigBis ? p.gueltigBis.german : '—' }}
-        td
-          span(v-if='p.anzahlAntraege')
-            | {{ p.anzahlAntraege }}
-            span(v-if='p.letzterAntrag')  (zuletzt {{ p.letzterAntrag.german }})
-          span(v-else) —
-        td.text-caption
-          div(v-if='p.email') {{ p.email }}
-          div(v-if='p.telefon') {{ p.telefon }}
-          span(v-if='!p.email && !p.telefon') —
-        td.text-right
-          v-btn(
-            v-if='darfEintragen(p)',
-            size='small',
-            variant='text',
-            prepend-icon='verified_user',
-            @click='fzDialog.show(p)'
-          ) FZ
-
-  template(#dialogs)
-    add-fz(ref='fzDialog', @gespeichert='laden')
+  router-view(v-slot='{ Component }')
+    component(:is='Component', :me='me')
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
-import addFz from '../../../../lib/addFz.lib.vue'
-import { useApi } from '../../../../plugins/api'
-import { useRouter } from '../../../../plugins/router'
+import { computed } from 'vue'
 import type { PortalMe } from '../../../../plugins/auth'
-import filterGenerator from '../../../../util/filter.util'
+import { useRouter } from '../../../../plugins/router'
 
 /**
- * FZ-Liste eines EC-Kreises.
+ * Rahmen eines EC-Kreises.
  *
- * Zwei Ansichten: "Relevante" zeigt genau die Auswahl der Monats-Mail, damit
- * Web-Ansicht und Excel dieselbe Menge zeigen. "Alle Personen" nimmt jede
- * Person des Kreises dazu, auch die ganz ohne FZ-Vorgang.
- *
- * Der Umschalter hängt an einem Query-Parameter, steht also in der URL und
- * übersteht ein Neuladen.
+ * Ein Kreis hat zwei getrennte Aufgaben mit je eigener Verantwortlicher:
+ * Führungszeugnisse und Mitgliederpflege. Wer nur eine davon hat, sieht auch
+ * nur eine — die Navigation unten erscheint dann gar nicht erst.
  */
 const props = defineProps<{ me: PortalMe }>()
+const { route } = useRouter()
 
-const api = useApi()
-const { route, booleanQueryRef } = useRouter()
-const fzDialog = useTemplateRef<InstanceType<typeof addFz>>('fzDialog')
+const id = computed(() => parseInt(route.value.params.id as string, 10))
+const kreis = computed(
+  () => props.me.kreise.find((k) => k.ecKreisID === id.value) ?? null
+)
 
-const alle = booleanQueryRef('alle')
-const ansicht = computed({
-  get: () => (alle.value ? 'alle' : 'ampel'),
-  set: (v: string) => {
-    alle.value = v === 'alle'
+const untertitel = computed(() => {
+  const r = kreis.value?.rollen ?? []
+  if (r.includes('fz') && r.includes('ort')) {
+    return 'Führungszeugnisse und Mitglieder'
   }
+  return r.includes('ort') ? 'Mitglieder' : 'Führungszeugnisse'
 })
 
-const suche = ref('')
-const daten = ref<any>(null)
-const laedtGerade = ref(false)
-
-const kreisID = computed(() => parseInt(route.value.params.id as string, 10))
-
-const gefiltert = computed(() => {
-  if (!daten.value) return []
-  return daten.value.personen.filter(filterGenerator(suche.value))
+const nav = computed(() => {
+  const r = kreis.value?.rollen ?? []
+  const punkte = []
+  if (r.includes('fz')) {
+    punkte.push({
+      icon: 'verified_user',
+      label: 'Führungszeugnisse',
+      to: `/kreis/${id.value}/fz`
+    })
+  }
+  if (r.includes('ort')) {
+    punkte.push({
+      icon: 'groups',
+      label: 'Mitglieder',
+      to: `/kreis/${id.value}/mitglieder`
+    })
+  }
+  // Bei nur einer Aufgabe wäre eine Leiste mit einem einzigen Knopf sinnlos.
+  return punkte.length > 1 ? punkte : []
 })
-
-/**
- * Ein Führungszeugnis gibt es erst ab 14 (BZRG). Der Button bleibt für
- * Jüngere aus -- die API weist es ohnehin ab, aber ein Button, der immer in
- * eine Fehlermeldung läuft, ist eine schlechte Liste. Für die eigene Person
- * ebenfalls nicht: das Vier-Augen-Prinzip erzwingt der Server.
- */
-function darfEintragen(p: any): boolean {
-  if (p.personID === props.me.user.personID) return false
-  if (!p.gebDat) return true
-  const vierzehn = new Date(p.gebDat.input)
-  vierzehn.setFullYear(vierzehn.getFullYear() + 14)
-  return vierzehn <= new Date()
-}
-
-async function laden() {
-  laedtGerade.value = true
-  try {
-    daten.value = await api.get(
-      `/portal/kreis/${kreisID.value}/personen?modus=${alle.value ? 'alle' : 'ampel'}`
-    )
-  } finally {
-    laedtGerade.value = false
-  }
-}
-
-watch([kreisID, alle], laden, { immediate: true })
-
-/**
- * CSV-Export mit BOM: ohne das öffnet Excel die Datei als Latin-1 und macht
- * aus "Neumünster" Buchstabensalat. Gleiches Vorgehen wie auf der FZ-Seite
- * der Verwaltung.
- */
-function csv() {
-  const kopf = [
-    'PersonenNr',
-    'Vorname',
-    'Nachname',
-    'Geburtstag',
-    'Status',
-    'Letztes FZ vom',
-    'Gültig bis',
-    'Erster Antrag',
-    'Letzter Antrag',
-    'Anzahl Anträge',
-    'E-Mail',
-    'Telefon'
-  ]
-  const zelle = (v: unknown) => {
-    const s = String(v ?? '')
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const zeilen = gefiltert.value.map((p: any) =>
-    [
-      p.personID,
-      p.vorname,
-      p.nachname,
-      p.gebDat?.german ?? '',
-      p.farbe,
-      p.fzVon?.german ?? '',
-      p.gueltigBis?.german ?? '',
-      p.ersterAntrag?.german ?? '',
-      p.letzterAntrag?.german ?? '',
-      p.anzahlAntraege,
-      p.email,
-      p.telefon
-    ]
-      .map(zelle)
-      .join(';')
-  )
-
-  const inhalt = '﻿' + [kopf.join(';'), ...zeilen].join('\n')
-  const url = URL.createObjectURL(
-    new Blob([inhalt], { type: 'text/csv;charset=utf-8' })
-  )
-  const a = document.getElementById('ec-download') as HTMLAnchorElement
-  a.href = url
-  a.download = `FZ-${daten.value.kreis.bezeichnung}.csv`
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10000)
-}
 </script>

@@ -14,16 +14,21 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
       v-list-item(
         v-for='k in me.kreise',
         :key='k.ecKreisID',
-        @click='navigate({ path: `/kreis/${k.ecKreisID}` })'
+        @click='navigate({ path: kreisStart(k) })'
       )
         template(#prepend)
           v-icon place
         v-list-item-title {{ k.bezeichnung }}
-        v-list-item-subtitle
-          span(v-if='k.offen') {{ k.offen }} {{ k.offen === 1 ? 'Person braucht' : 'Personen brauchen' }} ein Führungszeugnis
-          span(v-else) Alle Führungszeugnisse sind aktuell
+        v-list-item-subtitle {{ kreisText(k) }}
         template(#append)
-          ec-ampel(:farbe='k.offen ? "red" : "green"', :label='String(k.offen)')
+          //- Die Ampel zeigt den Führungszeugnis-Stand. Wer den Kreis nur
+          //- als Ortsverantwortliche betreut, sieht ihn nicht.
+          ec-ampel(
+            v-if='k.rollen.includes("fz")',
+            :farbe='k.offen ? "red" : "green"',
+            :label='String(k.offen)'
+          )
+          v-chip(v-else, size='small', variant='tonal') Mitglieder
 
   template(v-if='me.veranstaltungen.length')
     h2.text-h6.mb-2(v-font, v-primary) Meine Freizeiten
@@ -64,6 +69,28 @@ import { useRouter } from '../../plugins/router'
  */
 const props = defineProps<{ me: PortalMe }>()
 const { navigate } = useRouter()
+
+type Kreis = PortalMe['kreise'][number]
+
+/** Ein Kreis hat zwei Aufgaben; ohne FZ-Rolle geht es direkt zu den Mitgliedern. */
+function kreisStart(k: Kreis) {
+  return k.rollen.includes('fz')
+    ? `/kreis/${k.ecKreisID}/fz`
+    : `/kreis/${k.ecKreisID}/mitglieder`
+}
+
+function kreisText(k: Kreis) {
+  const teile: string[] = []
+  if (k.rollen.includes('fz')) {
+    teile.push(
+      k.offen
+        ? `${k.offen} ${k.offen === 1 ? 'Person braucht' : 'Personen brauchen'} ein Führungszeugnis`
+        : 'Alle Führungszeugnisse sind aktuell'
+    )
+  }
+  if (k.rollen.includes('ort')) teile.push('Mitgliederliste')
+  return teile.join(' · ')
+}
 
 /** Küchenleitung hat keinen FZ-Teil — für sie ist die TN-Liste der Einstieg. */
 function startseite(v: { veranstaltungsID: number; umfang: string }) {

@@ -21,7 +21,7 @@ v-app
         v-list-item(
           v-for='k in me.kreise',
           :key='k.ecKreisID',
-          :to='`/kreis/${k.ecKreisID}`'
+          :to='kreisStart(k)'
         )
           template(#prepend)
             v-icon place
@@ -101,6 +101,16 @@ const initialen = computed(() =>
     ? `${me.value.user.vorname[0] ?? ''}${me.value.user.nachname[0] ?? ''}`
     : ''
 )
+
+/**
+ * Wohin ein EC-Kreis im Menue fuehrt. Ein Kreis hat zwei getrennte Aufgaben;
+ * wer nur die Mitgliederpflege hat, landet direkt dort.
+ */
+function kreisStart(k: { ecKreisID: number; rollen: string[] }) {
+  return k.rollen.includes('fz')
+    ? `/kreis/${k.ecKreisID}/fz`
+    : `/kreis/${k.ecKreisID}/mitglieder`
+}
 
 /**
  * Wohin eine Freizeit im Menue fuehrt. Die Kuechenleitung hat keinen

@@ -16,7 +16,16 @@ export interface PortalMe {
     ecKreisID: number
     bezeichnung: string
     needsFZ: boolean
-    offen: number
+    /**
+     * 'fz'  — Führungszeugnis-Liste und Zeugnisse eintragen
+     * 'ort' — Mitgliederliste des Kreises pflegen
+     *
+     * Zwei getrennte Aufgaben mit je eigener Verantwortlicher. Wer beides
+     * macht, hat beide Rollen.
+     */
+    rollen: Array<'fz' | 'ort'>
+    /** Offene Führungszeugnisse; null, wenn die Rolle 'fz' fehlt. */
+    offen: number | null
   }>
   veranstaltungen: Array<{
     veranstaltungsID: number
