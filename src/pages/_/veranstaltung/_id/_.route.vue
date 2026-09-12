@@ -36,16 +36,25 @@ const zeitraum = computed(() => {
     : v.value.begin.german
 })
 
-const nav = computed(() => [
-  {
-    icon: 'verified_user',
-    label: 'Mitarbeitende',
-    to: `/veranstaltung/${id.value}/mitarbeiter`
-  },
-  {
+/**
+ * Die Küchenleitung bekommt den Führungszeugnis-Teil gar nicht erst angeboten.
+ * Der Server weist ihn ohnehin ab — ein Menüpunkt, der immer in eine
+ * Fehlermeldung läuft, wäre nur irreführend.
+ */
+const nav = computed(() => {
+  const tn = {
     icon: 'list',
     label: 'TN-Liste',
     to: `/veranstaltung/${id.value}/tnliste`
   }
-])
+  if (v.value?.umfang === 'kueche') return [tn]
+  return [
+    {
+      icon: 'verified_user',
+      label: 'Mitarbeitende',
+      to: `/veranstaltung/${id.value}/mitarbeiter`
+    },
+    tn
+  ]
+})
 </script>

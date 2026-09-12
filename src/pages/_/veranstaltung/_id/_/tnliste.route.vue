@@ -50,8 +50,9 @@ div
         th Rolle
         th Name
         th Geburtstag
-        th Adresse
+        th(v-if='umfang === "voll"') Adresse
         th Kontakt
+        th(v-if='umfang === "kueche"') Essen
     tbody
       tr(v-for='a in gefiltert', :key='a.anmeldeID')
         td
@@ -59,15 +60,24 @@ div
             | {{ rolle(a.position) }}
         td {{ a.person.vorname }} {{ a.person.nachname }}
         td {{ a.person.gebDat ? a.person.gebDat.german : '—' }}
-        td.text-caption {{ a.adresse.strasse }}, {{ a.adresse.plz }} {{ a.adresse.ort }}
+        td.text-caption(v-if='umfang === "voll"')
+          | {{ a.adresse.strasse }}, {{ a.adresse.plz }} {{ a.adresse.ort }}
         td.text-caption
           div(v-if='a.telefon.telefon') {{ a.telefon.telefon }}
           div(v-if='a.email.eMail') {{ a.email.eMail }}
+        td.text-caption(v-if='umfang === "kueche"')
+          v-chip(v-if='a.vegetarisch', size='x-small', variant='tonal') vegetarisch
+          span.text-medium-emphasis(v-else) —
 
   v-alert.mt-4(type='info', variant='tonal', density='compact')
-    | Gesundheitsangaben und Allergien sind in dieser Ansicht bewusst
-    | ausgeblendet. Sie stehen in den Excel-Listen — dort werden sie erst beim
-    | Herunterladen geladen.
+    span(v-if='umfang === "kueche"')
+      | Als Küchenleitung siehst du die Küchenliste dieser Freizeit. Allergien
+      | und Ernährungshinweise stehen in der Excel-Liste — sie werden erst beim
+      | Herunterladen geladen.
+    span(v-else)
+      | Gesundheitsangaben und Allergien sind in dieser Ansicht bewusst
+      | ausgeblendet. Sie stehen in den Excel-Listen — dort werden sie erst
+      | beim Herunterladen geladen.
 </template>
 
 <script setup lang="ts">
@@ -77,6 +87,7 @@ import { useRouter } from '../../../../../plugins/router'
 import { useStorage } from '../../../../../storage'
 import { useDialog } from '../../../../../plugins/dialog'
 import filterGenerator from '../../../../../util/filter.util'
+import type { PortalMe } from '../../../../../plugins/auth'
 import {
   generate,
   getTemplates,
@@ -93,6 +104,8 @@ import {
  * wenn jemand die Excel-Liste tatsächlich exportiert -- nicht schon beim
  * Öffnen der Seite.
  */
+const props = defineProps<{ me: PortalMe }>()
+
 const api = useApi()
 const { route } = useRouter()
 const { authToken } = useStorage()
@@ -128,8 +141,23 @@ const gefiltert = computed(() =>
   nachGruppe.value.filter(filterGenerator(suche.value))
 )
 
+/**
+ * Was die angemeldete Person bei dieser Freizeit darf. Die Küchenleitung
+ * bekommt vom Server ein reduziertes Feldset — Adressen und Geschlecht fehlen
+ * dort, deshalb richten sich Spalten und Zähler danach.
+ */
+const umfang = computed(
+  () =>
+    props.me.veranstaltungen.find((v) => v.veranstaltungsID === id.value)
+      ?.umfang ?? 'voll'
+)
+
 const zaehler = computed(() => {
   const l = nachGruppe.value
+  if (umfang.value === 'kueche') {
+    const veg = l.filter((a: any) => a.vegetarisch).length
+    return `${l.length} gesamt · ${veg} vegetarisch`
+  }
   const m = l.filter((a: any) => a.person.geschlecht === 'm').length
   const w = l.filter((a: any) => a.person.geschlecht === 'w').length
   return `${l.length} gesamt · ${m} m · ${w} w`

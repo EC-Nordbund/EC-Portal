@@ -26,8 +26,14 @@ export interface PortalMe {
     ende: { german: string; input: string } | null
     position: number
     positionText: string
-    mitarbeiter: number
-    fzOffen: number
+    /**
+     * 'voll' fuer Leitung und Hauptleitung, 'kueche' fuer die Kuechenleitung.
+     * Bei 'kueche' gibt es keinen Fuehrungszeugnis-Teil und nur die
+     * Kuechenliste; die beiden Zaehler sind dann null.
+     */
+    umfang: 'voll' | 'kueche'
+    mitarbeiter: number | null
+    fzOffen: number | null
   }>
 }
 

@@ -2,6 +2,8 @@
 div
   v-progress-linear(v-if='laedtGerade', indeterminate, color='primary')
 
+  v-alert(v-if='abgewiesen', type='info', variant='tonal') {{ abgewiesen }}
+
   v-alert.mb-4(
     v-if='daten && offene',
     type='warning',
@@ -66,10 +68,28 @@ const offene = computed(
       .length ?? 0
 )
 
+const abgewiesen = ref('')
+
+/**
+ * Der Fehler wird hier abgefangen und nicht weitergeworfen: die Seite ist
+ * über die Navigation zwar nur bei vollem Zugriff erreichbar, per direkter
+ * Adresse aber schon (etwa über ein altes Lesezeichen). Ohne catch bliebe eine
+ * unbehandelte Ablehnung in der Konsole stehen, während die Seite leer wirkt.
+ */
 async function laden() {
   laedtGerade.value = true
+  abgewiesen.value = ''
   try {
-    daten.value = await api.get(`/portal/veranstaltung/${id.value}/mitarbeiter`)
+    daten.value = await api.get(
+      `/portal/veranstaltung/${id.value}/mitarbeiter`,
+      { quiet: true }
+    )
+  } catch (err: any) {
+    daten.value = null
+    abgewiesen.value =
+      err?.status === 403
+        ? err.message
+        : 'Die Liste konnte nicht geladen werden.'
   } finally {
     laedtGerade.value = false
   }

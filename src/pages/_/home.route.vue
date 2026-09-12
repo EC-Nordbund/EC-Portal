@@ -31,7 +31,7 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
       v-list-item(
         v-for='v in me.veranstaltungen',
         :key='v.veranstaltungsID',
-        @click='navigate({ path: `/veranstaltung/${v.veranstaltungsID}/mitarbeiter` })'
+        @click='navigate({ path: startseite(v) })'
       )
         template(#prepend)
           v-icon event
@@ -39,9 +39,15 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
         v-list-item-subtitle
           | {{ v.begin ? v.begin.german : '' }}
           span(v-if='v.ende')  – {{ v.ende.german }}
-          |  · {{ v.positionText }} · {{ v.mitarbeiter }} Mitarbeitende
+          |  · {{ v.positionText }}
+          span(v-if='v.umfang === "voll"')  · {{ v.mitarbeiter }} Mitarbeitende
         template(#append)
+          //- Der Führungszeugnis-Stand gehört zum FZ-Teil; die Küchenleitung
+          //- sieht ihn nicht und bekommt stattdessen den Hinweis, was sie hier
+          //- findet.
+          v-chip(v-if='v.umfang !== "voll"', size='small', variant='tonal') Küchenliste
           ec-ampel(
+            v-else,
             :farbe='v.fzOffen ? "red" : "green"',
             :label='v.fzOffen ? `${v.fzOffen} ohne FZ` : "vollständig"'
           )
@@ -58,6 +64,13 @@ import { useRouter } from '../../plugins/router'
  */
 const props = defineProps<{ me: PortalMe }>()
 const { navigate } = useRouter()
+
+/** Küchenleitung hat keinen FZ-Teil — für sie ist die TN-Liste der Einstieg. */
+function startseite(v: { veranstaltungsID: number; umfang: string }) {
+  return v.umfang === 'kueche'
+    ? `/veranstaltung/${v.veranstaltungsID}/tnliste`
+    : `/veranstaltung/${v.veranstaltungsID}/mitarbeiter`
+}
 
 const begruessung = computed(() => `Hallo ${props.me.user.vorname}`)
 const hatZustaendigkeit = computed(

@@ -35,7 +35,7 @@ v-app
         v-list-item(
           v-for='v in me.veranstaltungen',
           :key='v.veranstaltungsID',
-          :to='`/veranstaltung/${v.veranstaltungsID}/mitarbeiter`'
+          :to='startseite(v)'
         )
           template(#prepend)
             v-icon event
@@ -101,6 +101,16 @@ const initialen = computed(() =>
     ? `${me.value.user.vorname[0] ?? ''}${me.value.user.nachname[0] ?? ''}`
     : ''
 )
+
+/**
+ * Wohin eine Freizeit im Menue fuehrt. Die Kuechenleitung hat keinen
+ * Fuehrungszeugnis-Teil, fuer sie ist die TN-Liste die Startseite.
+ */
+function startseite(v: { veranstaltungsID: number; umfang: string }) {
+  return v.umfang === 'kueche'
+    ? `/veranstaltung/${v.veranstaltungsID}/tnliste`
+    : `/veranstaltung/${v.veranstaltungsID}/mitarbeiter`
+}
 
 function zumLogin() {
   logout()
