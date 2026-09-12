@@ -24,7 +24,7 @@ DEV_PORT=8092 API_BASE=http://localhost:4000 npm run dev
 
 Port 8092, weil 8080 (accountdesk), 8090 (EC-Verwaltung) und 8091 (deren
 HMR-Socket) belegt sind. Die API läuft über `dev/run-api.sh` auf 4000, das
-Datenbank-Schema liegt in `dev/dumps/zz-portal-schema.sql`.
+Datenbank-Schema liegt in `EC-Api/sql/portal-schema.sql`.
 
 Demo-Zugänge aus `dev/seed-demo.sql`, Passwort jeweils `Nordsee-Kutter-2026`:
 
