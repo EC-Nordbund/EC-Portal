@@ -32,6 +32,24 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
+/**
+ * Dateiname aus Content-Disposition. Bevorzugt `filename*` (RFC 5987), weil
+ * nur das Umlaute traegt -- "EC Neumünster" steht im reinen `filename=` nicht.
+ */
+function dateinameAus(header: string | null): string {
+  if (!header) return 'download'
+  const stern = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (stern) {
+    try {
+      return decodeURIComponent(stern[1])
+    } catch {
+      /* kaputt kodiert -- dann eben der einfache Name */
+    }
+  }
+  const einfach = /filename="?([^";]+)"?/i.exec(header)
+  return einfach ? einfach[1] : 'download'
+}
+
 export const useApi = defineUseFunction(() => {
   const { authToken } = useStorage()
   const { error } = useDialog()
@@ -81,6 +99,47 @@ export const useApi = defineUseFunction(() => {
 
     if (res.status === 204) return undefined as T
     return (await res.json()) as T
+  }
+
+  /**
+   * Dateidownload mit Anmeldung.
+   *
+   * Ein einfacher Link ginge nicht: der Token steht im Authorization-Header
+   * und nicht in der URL, ein <a href> schickt ihn also nicht mit. Deshalb
+   * holt der Client die Datei selbst und reicht sie als Blob weiter.
+   *
+   * Der Dateiname kommt aus Content-Disposition -- lesbar nur, weil die API
+   * den Header per CORS freigibt (exposedHeaders in EC-Api/src/index.ts).
+   */
+  async function requestBlob(
+    path: string,
+    opts: RequestOptions = {}
+  ): Promise<{ blob: Blob; dateiname: string; headers: Headers }> {
+    const headers: Record<string, string> = {}
+    if (opts.auth !== false && authToken.value) {
+      headers.authorization = authToken.value
+    }
+
+    let res: Response
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method: opts.method ?? 'GET',
+        headers,
+        signal: opts.signal
+      })
+    } catch (e) {
+      const err = new ApiError('Keine Verbindung zur API.', 0, 'NETWORK', path)
+      if (!opts.quiet) error({ title: 'Verbindungsfehler', text: err.message })
+      throw err
+    }
+
+    if (!res.ok) throw await baueFehler(res, path, opts)
+
+    return {
+      blob: await res.blob(),
+      dateiname: dateinameAus(res.headers.get('content-disposition')),
+      headers: res.headers
+    }
   }
 
   /**
@@ -134,6 +193,7 @@ export const useApi = defineUseFunction(() => {
 
   return {
     request,
+    requestBlob,
     get: <T>(path: string, o?: RequestOptions) => request<T>(path, o),
     post: <T>(path: string, body: unknown, o?: RequestOptions) =>
       request<T>(path, { ...o, method: 'POST', body }),

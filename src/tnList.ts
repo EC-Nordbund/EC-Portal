@@ -1,4 +1,5 @@
 import { API_BASE } from './plugins/apiBase'
+import saveBlob from './util/download.util'
 
 /**
  * Erzeugung der TN-Listen (Küche/Leiter/Mitarbeiter/Zuschüsse/Spezial-MA) aus
@@ -127,16 +128,12 @@ export async function generate(
 }
 
 export function saveByteArray(reportName: string, byte: ArrayBuffer): void {
-  const blob = new Blob([byte], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  })
-  const link = document.getElementById('ec-download') as HTMLAnchorElement
-  const url = window.URL.createObjectURL(blob)
-  link.href = url
-  link.download = reportName
-  link.click()
-  // Ohne revoke bleibt der Blob bis zum Reload im Speicher
-  setTimeout(() => window.URL.revokeObjectURL(url), 10000)
+  saveBlob(
+    reportName,
+    new Blob([byte], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+  )
 }
 
 function dateDiffInYears(dateoldS: string, datenewS: string): number {

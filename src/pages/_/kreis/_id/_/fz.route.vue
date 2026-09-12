@@ -9,6 +9,13 @@ div
       v-btn(
         variant='text',
         size='small',
+        prepend-icon='qr_code_2',
+        :loading='qrLaeuft',
+        @click='qrBlatt'
+      ) QR-Blatt
+      v-btn(
+        variant='text',
+        size='small',
         prepend-icon='download',
         :disabled='!gefiltert.length',
         @click='csv'
@@ -71,6 +78,8 @@ import { useApi } from '../../../../../plugins/api'
 import { useRouter } from '../../../../../plugins/router'
 import type { PortalMe } from '../../../../../plugins/auth'
 import filterGenerator from '../../../../../util/filter.util'
+import saveBlob from '../../../../../util/download.util'
+import { useDialog } from '../../../../../plugins/dialog'
 
 /**
  * FZ-Liste eines EC-Kreises.
@@ -96,7 +105,10 @@ const ansicht = computed({
   }
 })
 
+const { notifyInfo } = useDialog()
+
 const suche = ref('')
+const qrLaeuft = ref(false)
 const daten = ref<any>(null)
 const laedtGerade = ref(false)
 
@@ -178,13 +190,39 @@ function csv() {
   )
 
   const inhalt = '﻿' + [kopf.join(';'), ...zeilen].join('\n')
-  const url = URL.createObjectURL(
+  saveBlob(
+    `FZ-${daten.value.kreis.bezeichnung}.csv`,
     new Blob([inhalt], { type: 'text/csv;charset=utf-8' })
   )
-  const a = document.getElementById('ec-download') as HTMLAnchorElement
-  a.href = url
-  a.download = `FZ-${daten.value.kreis.bezeichnung}.csv`
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10000)
+}
+
+/**
+ * QR-Blatt zur Mitarbeitererfassung.
+ *
+ * Das Blatt wird ausgehängt; wer im Kreis mitarbeitet, scannt es und meldet
+ * sich an. Bisher kam es auf Nachfrage aus der Geschäftsstelle.
+ *
+ * Das Erzeugen ändert nichts am Bestand: bereits ausgehängte Codes laufen
+ * unverändert weiter, es kommt nur ein neues Blatt dazu. Deshalb keine
+ * Rückfrage vor dem Download -- nur der Hinweis danach, bis wann das frische
+ * Blatt gilt. Die Jahreszahl kommt vom Server, damit die Fünf-Jahres-Regel
+ * nicht ein zweites Mal im Frontend steht.
+ */
+async function qrBlatt() {
+  qrLaeuft.value = true
+  try {
+    const { blob, dateiname, headers } = await api.requestBlob(
+      `/portal/kreis/${kreisID.value}/qr`
+    )
+    saveBlob(dateiname, blob)
+    const jahr = headers.get('X-QR-Jahr')
+    notifyInfo(
+      jahr
+        ? `QR-Blatt erzeugt — gültig bis 31.12.${jahr}. Ältere Aushänge bleiben gültig.`
+        : 'QR-Blatt erzeugt.'
+    )
+  } finally {
+    qrLaeuft.value = false
+  }
 }
 </script>
