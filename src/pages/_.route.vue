@@ -15,6 +15,14 @@ v-app
           v-icon home
         v-list-item-title Übersicht
 
+      //- Downloads sieht, wer ueberhaupt einen Bereich hat: Freizeiten oder
+      //- EC-Kreise. Der Server liefert sonst eine leere Liste, und ein
+      //- Menuepunkt, hinter dem nichts steht, ist ein Versprechen zu viel.
+      v-list-item(v-if='hatDownloads', to='/downloads')
+        template(#prepend)
+          v-icon folder_shared
+        v-list-item-title Downloads
+
       template(v-if='me && me.kreise.length')
         v-divider.my-2
         v-list-subheader Meine EC-Kreise
@@ -94,6 +102,15 @@ watch(
     theme.global.name.value = v ? 'dark' : 'light'
   },
   { immediate: true }
+)
+
+/** Downloads gibt es nur, wenn mindestens ein Bereich zutrifft. */
+const hatDownloads = computed(
+  () =>
+    !!me.value &&
+    (me.value.kreise.length > 0 ||
+      me.value.veranstaltungen.length > 0 ||
+      me.value.user.superuser)
 )
 
 const initialen = computed(() =>
