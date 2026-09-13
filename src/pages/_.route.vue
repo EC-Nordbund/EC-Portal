@@ -52,6 +52,18 @@ v-app
           template(#append)
             v-chip(v-if='v.fzOffen', size='x-small', color='#C62828') {{ v.fzOffen }}
 
+      template(v-if='me && me.user.schutzkonzeptVerwalter')
+        v-divider.my-2
+        v-list-subheader Schutzkonzept
+        v-list-item(to='/schutzkonzept/formular')
+          template(#prepend)
+            v-icon edit_note
+          v-list-item-title Formular
+        v-list-item(to='/schutzkonzept/kreise')
+          template(#prepend)
+            v-icon shield
+          v-list-item-title EC-Kreise
+
   v-app-bar(v-accent-bg, density='comfortable')
     v-app-bar-nav-icon(@click='drawer = !drawer')
     v-toolbar-title.text-white EC-Nordbund Portal
@@ -78,6 +90,7 @@ import { useLogin } from '../plugins/auth'
 import { useApi } from '../plugins/api'
 import { useRouter } from '../plugins/router'
 import { useStorage } from '../storage'
+import { loescheAlleEntwuerfe } from '../util/skEntwurf.util'
 
 /**
  * Layout und Zugangsschutz für alles unterhalb von '/'.
@@ -144,9 +157,21 @@ function zumLogin() {
   router.push({ path: '/login', query: { next: route.value.fullPath } })
 }
 
-function abmelden() {
+/**
+ * Erst navigieren, dann abmelden: Die Leave-Guards (z. B. im Formular-Builder)
+ * fragen nach ungespeicherten Änderungen. Wäre der Token schon weg, ließe sich
+ * bei „Abbrechen“ nichts mehr speichern. Bleibt man auf der Seite, bleibt man
+ * auch angemeldet.
+ */
+async function abmelden() {
+  const fehlschlag = await router.push('/login')
+  if (fehlschlag) return
   logout()
-  router.push('/login')
+  // Nur beim bewussten Abmelden: Auf einem geteilten Rechner bekäme der
+  // nächste Nutzer sonst den ungespeicherten Formular-Entwurf des Vorgängers
+  // zur Wiederherstellung angeboten. Beim Rauswurf durch einen abgelaufenen
+  // Token (zumLogin) bleibt der Entwurf liegen -- genau dafür gibt es ihn.
+  loescheAlleEntwuerfe()
 }
 
 async function laden() {

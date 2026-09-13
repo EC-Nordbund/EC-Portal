@@ -54,6 +54,28 @@ Demo-Zugänge aus `dev/seed-demo.sql`, Passwort jeweils `Nordsee-Kutter-2026`:
   `Referer`.
 - **Rund 25 Dateien sind Kopien aus EC-Verwaltung.** Siehe `DUPLIKATE.md`.
 
+## Schutzkonzept-Verwaltung
+
+Wer im Portal-Zugang das Flag **Schutzkonzept-Verwalter** hat (gesetzt in der
+Verwaltung unter *Portal-Zugänge*; Superuser immer), sieht im Menü die Gruppe
+*Schutzkonzept*:
+
+- **Formular** (`/schutzkonzept/formular`, Builder unter
+  `/schutzkonzept/version/:id`): Bereiche (Stepper-Schritte) › Abschnitte
+  (Cards) › Felder mit interner Bezeichnung = Platzhalter in den
+  DOCX-Vorlagen. Streng versioniert: neue Version kopiert die letzte
+  veröffentlichte samt Vorlagen, Entwurf bearbeiten, veröffentlichen — danach
+  eingefroren (auch in der DB per Trigger). Die Prüfung läuft live mit
+  demselben Code wie auf dem Server.
+- **EC-Kreise** (`/schutzkonzept/kreise`, Detail `/schutzkonzept/kreis/:id`):
+  Stand je Kreis, veröffentlichte PDFs, Daten lesend. „Im
+  Schutzkonzept-System öffnen“ erzeugt einen 5-Minuten-Einmal-Link, mit dem
+  die Verwaltung genau diesen Kreis im Ausfüll-System
+  (`schutzkonzept.ec-nordbund.de`) bearbeitet.
+
+Die REST-Routen liegen in `EC-Api/src/api/schutzkonzept.ts` unter
+`/portal/schutzkonzept/*`.
+
 ## Deployment
 
 GitHub Actions baut und rsynct von `main` nach

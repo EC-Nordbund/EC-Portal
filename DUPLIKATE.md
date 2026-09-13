@@ -41,12 +41,35 @@ Referenzstand: EC-Verwaltung `de016c0`.
 
 - `src/lib/wrapper.lib.vue` — ohne Lesezeichen-Button; die Navigationsleiste
   bleibt dauerhaft sichtbar statt sich nach zwei Sekunden auszublenden (ohne
-  `mouseover` auf Touch-Geräten sonst nicht mehr erreichbar).
+  `mouseover` auf Touch-Geräten sonst nicht mehr erreichbar). Ausserdem steht
+  der Reload-Button ausserhalb des `hasDial`-Blocks: im Portal setzen die
+  Schutzkonzept-Seiten nur `hasReload`, in EC-Verwaltung hing der Knopf am
+  Sprechblasen-Menü und war damit nie sichtbar.
 - `src/forms/formular.vue` — Komponenten-Map auf die acht tatsächlich
   genutzten Feldtypen gekürzt.
 - `src/forms/main.ts` — ohne Anmelde-Formular und Schema-Registry.
 - `src/storage/index.ts` — eigene Schlüssel mit Präfix `ecPortal:`.
 - `src/tnList.ts` — Datenquelle REST statt GraphQL, Vorlagen aus der API.
+
+## Schutzkonzept (Kopien über drei Repos)
+
+Nicht aus EC-Verwaltung, sondern zwischen Portal, EC-Api und dem Repo
+`schutzkonzept` (Ausfüll-System der EC-Kreise). Backend und beide Frontends
+rechnen Fortschritt, Pflichtfelder, Bereinigung und Prüfung mit exakt
+demselben Code -- Änderungen deshalb immer in allen Kopien spiegeln.
+
+| Portal | Kopie in | identisch |
+| --- | --- | --- |
+| `src/schutzkonzept/definition.ts` | `EC-Api/src/schutzkonzept/definition.ts`, `schutzkonzept/src/schutzkonzept/definition.ts` | ja |
+| `src/schutzkonzept/feld.vue` | `schutzkonzept/src/schutzkonzept/feld.vue` | ja |
+| `src/schutzkonzept/abschnitt.vue` | `schutzkonzept/src/schutzkonzept/abschnitt.vue` | ja |
+
+```bash
+diff src/schutzkonzept/definition.ts ../EC-Api/src/schutzkonzept/definition.ts
+diff -r src/schutzkonzept ../schutzkonzept/src/schutzkonzept
+```
+
+`src/schutzkonzept/format.ts` gehört nur dem Portal.
 
 ## Pflege
 

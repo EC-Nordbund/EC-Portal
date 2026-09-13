@@ -11,6 +11,11 @@ export interface PortalMe {
     nachname: string
     email: string
     superuser: boolean
+    /**
+     * Globale Verantwortung „Schutzkonzept-Verwalter“: baut das Formular und
+     * sieht die Schutzkonzepte aller EC-Kreise. Superuser haben sie immer.
+     */
+    schutzkonzeptVerwalter: boolean
   }
   kreise: Array<{
     ecKreisID: number

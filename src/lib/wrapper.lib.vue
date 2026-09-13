@@ -36,9 +36,12 @@ v-card(
       //- KOPIE aus EC-Verwaltung/src/lib/wrapper.lib.vue.
       //- Der Lesezeichen-Button ist entfernt: das ist ein Werkzeug fuer
       //- Poweruser der Verwaltung, das Portal hat eine Handvoll Seiten.
-      v-btn(icon, variant='text', v-if='hasReload', @click='emit("reload")')
-        v-icon replay
       slot(name='menu')
+    //- Abweichung von EC-Verwaltung: Reload ausserhalb von hasDial. Dort hat
+    //- jede Seite den Dial; im Portal setzen die Schutzkonzept-Seiten nur
+    //- hasReload, und der Button waere sonst nie sichtbar.
+    v-btn(icon, variant='text', v-if='hasReload', @click='emit("reload")')
+      v-icon replay
   div(v-if='hasHeader')
     slot(name='header')
   v-card-text(style='overflow-y: auto', v-if='!hasRouterView')
