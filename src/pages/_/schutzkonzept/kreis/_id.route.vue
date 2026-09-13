@@ -110,7 +110,9 @@ ec-wrapper(
                 th Erinnerung
             tbody
               tr(v-for='(t, i) in erinnerungen.termine', :key='i', :class='{ "text-error": t.ueberfaellig }')
-                td {{ t.label }}
+                td
+                  .text-caption.text-medium-emphasis {{ t.abschnitt }}
+                  | {{ t.label }}
                 td.text-no-wrap {{ datum(t.datum) }}
                 td.text-no-wrap
                   v-icon.mr-1(v-if='t.ueberfaellig', size='small', color='error') warning
@@ -312,6 +314,7 @@ interface ErinnerungenAntwort {
   termine: {
     feldKey: string
     zeile: number | null
+    abschnitt: string
     label: string
     datum: string
     /** Tage bis zum Datum, negativ = vergangen. */
