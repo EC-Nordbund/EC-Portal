@@ -77,8 +77,16 @@ v-app
     .pa-2(v-if='geladen')
       router-view(v-slot='{ Component }')
         component(:is='Component', :me='me', @reload='laden')
-    .pa-8.text-center(v-else)
+    .pa-8.text-center(v-else-if='!fehler')
       v-progress-circular(indeterminate, color='primary')
+
+    //- Laden fehlgeschlagen, aber NICHT wegen der Anmeldung: hier bleibt man
+    //- angemeldet und kann es noch einmal versuchen.
+    .pa-6(v-else)
+      v-alert(type='warning', variant='tonal')
+        .mb-2 Deine Daten konnten gerade nicht geladen werden.
+        .text-caption.mb-3 {{ fehler }}
+        v-btn(variant='tonal', size='small', @click='laden') Erneut versuchen
 
   ec-dialog-host
 </template>
@@ -87,7 +95,7 @@ v-app
 import { computed, onMounted, ref, watch } from 'vue'
 import { useTheme } from 'vuetify'
 import { useLogin } from '../plugins/auth'
-import { useApi } from '../plugins/api'
+import { ApiError, useApi } from '../plugins/api'
 import { useRouter } from '../plugins/router'
 import { useStorage } from '../storage'
 import { loescheAlleEntwuerfe } from '../util/skEntwurf.util'
@@ -107,6 +115,7 @@ const api = useApi()
 
 const drawer = ref(true)
 const geladen = ref(false)
+const fehler = ref('')
 
 const theme = useTheme()
 watch(
@@ -174,12 +183,28 @@ async function abmelden() {
   loescheAlleEntwuerfe()
 }
 
+/**
+ * Beim Laden von /portal/me nur dann abmelden, wenn die API die ANMELDUNG
+ * ablehnt.
+ *
+ * Vorher flog jeder Fehler in denselben Zweig: eine kurz nicht erreichbare
+ * API, ein 503 nach einem Deployment, ein 429 vom Rate-Limiter -- und der
+ * Token war weg. Sichtbar wurde das nur beim Neuladen, weil /portal/me sonst
+ * kein zweites Mal aufgerufen wird; von aussen sah es aus wie „Reload meldet
+ * mich ab".
+ */
 async function laden() {
+  fehler.value = ''
   try {
     await ladeMe()
     geladen.value = true
-  } catch {
-    zumLogin()
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      zumLogin()
+      return
+    }
+    fehler.value =
+      err instanceof Error ? err.message : 'Unbekannter Fehler beim Laden.'
   }
 }
 
