@@ -17,7 +17,7 @@ div
     div(v-for='kategorie in bereich.kategorien', :key='kategorie.name')
       .text-caption.text-medium-emphasis.mt-3.mb-1(v-if='kategorie.name')
         | {{ kategorie.name }}
-      v-list(lines='two', density='comfortable')
+      v-list(lines='three', density='comfortable')
         v-list-item(
           v-for='d in kategorie.dateien',
           :key='d.downloadID',
