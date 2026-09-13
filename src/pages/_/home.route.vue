@@ -32,7 +32,7 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
 
   template(v-if='me.veranstaltungen.length')
     h2.text-h6.mb-2(v-font, v-primary) Meine Freizeiten
-    v-list(lines='two', border, rounded)
+    v-list.mb-6(lines='two', border, rounded)
       v-list-item(
         v-for='v in me.veranstaltungen',
         :key='v.veranstaltungsID',
@@ -56,6 +56,23 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
             :farbe='v.fzOffen ? "red" : "green"',
             :label='v.fzOffen ? `${v.fzOffen} ohne FZ` : "vollständig"'
           )
+
+  //- Globale Verantwortung: gilt für alle Kreise, hängt also an keinem
+  //- Eintrag oben. Ohne eigenen Block fände ein reiner Verwalter den Einstieg
+  //- nur im (auf dem Handy eingeklappten) Menü.
+  template(v-if='me.user.schutzkonzeptVerwalter')
+    h2.text-h6.mb-2(v-font, v-primary) Schutzkonzept
+    v-list(lines='two', border, rounded)
+      v-list-item(@click='navigate({ path: "/schutzkonzept/formular" })')
+        template(#prepend)
+          v-icon edit_note
+        v-list-item-title Formular
+        v-list-item-subtitle Formularversionen und DOCX-Vorlagen bearbeiten
+      v-list-item(@click='navigate({ path: "/schutzkonzept/kreise" })')
+        template(#prepend)
+          v-icon shield
+        v-list-item-title EC-Kreise
+        v-list-item-subtitle Stand der Schutzkonzepte aller EC-Kreise
 </template>
 
 <script setup lang="ts">
@@ -101,6 +118,9 @@ function startseite(v: { veranstaltungsID: number; umfang: string }) {
 
 const begruessung = computed(() => `Hallo ${props.me.user.vorname}`)
 const hatZustaendigkeit = computed(
-  () => props.me.kreise.length > 0 || props.me.veranstaltungen.length > 0
+  () =>
+    props.me.kreise.length > 0 ||
+    props.me.veranstaltungen.length > 0 ||
+    props.me.user.schutzkonzeptVerwalter
 )
 </script>

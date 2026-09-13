@@ -15,7 +15,9 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code: string,
-    public path: string
+    public path: string,
+    /** Strukturierte Zusatzinfos der API (error.details), z. B. fehlende Pflichtfelder. */
+    public details?: any
   ) {
     super(message)
     this.name = 'ApiError'
@@ -150,6 +152,40 @@ export const useApi = defineUseFunction(() => {
    * Rate-Limiter mit einem nackten Satz. Alle vier müssen zu einer brauchbaren
    * Meldung führen -- eine rohe HTML-Seite im Fehlerdialog wäre unbrauchbar.
    */
+  /**
+   * Datei-Upload als roher Body (kein multipart): die API liest ihn mit
+   * express.raw. Der Dateiname reist URI-kodiert im Header X-Dateiname.
+   */
+  async function upload<T>(
+    path: string,
+    datei: File,
+    opts: RequestOptions & { header?: Record<string, string> } = {}
+  ): Promise<T> {
+    const headers: Record<string, string> = {
+      'content-type':
+        datei.type ||
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'x-dateiname': encodeURIComponent(datei.name),
+      ...(opts.header ?? {})
+    }
+    if (authToken.value) headers.authorization = authToken.value
+
+    let res: Response
+    try {
+      res = await fetch(`${API_BASE}${path}`, {
+        method: opts.method ?? 'POST',
+        headers,
+        body: datei
+      })
+    } catch (e) {
+      const err = new ApiError('Keine Verbindung zur API.', 0, 'NETWORK', path)
+      if (!opts.quiet) error({ title: 'Verbindungsfehler', text: err.message })
+      throw err
+    }
+    if (!res.ok) throw await baueFehler(res, path, opts)
+    return (await res.json()) as T
+  }
+
   async function baueFehler(
     res: Response,
     path: string,
@@ -158,11 +194,13 @@ export const useApi = defineUseFunction(() => {
     const ct = res.headers.get('content-type') ?? ''
     let msg = ''
     let code = 'ERROR'
+    let details: any = undefined
 
     if (ct.includes('application/json')) {
       const j = await res.json().catch(() => null)
       msg = j?.error?.message ?? j?.message ?? ''
       code = j?.error?.code ?? code
+      details = j?.error?.details
     } else {
       msg = (await res.text().catch(() => '')).trim()
       if (msg.startsWith('<')) msg = '' // HTML-Fehlerseite: nicht anzeigbar
@@ -172,9 +210,16 @@ export const useApi = defineUseFunction(() => {
       msg = 'Zu viele Anfragen — bitte einen Moment warten.'
       code = 'RATE_LIMIT'
     }
+    // 413 kommt vom body-parser VOR dem Portal-Handler, als HTML-Seite ohne
+    // brauchbaren Text -- sonst stünde hier nur "Unerwarteter Fehler (HTTP 413)".
+    if (res.status === 413) {
+      msg =
+        'Die gesendeten Daten sind zu groß. Bei einer DOCX-Vorlage: höchstens 20 MB – eingebettete Schriften oder große Bilder entfernen.'
+      code = 'TOO_LARGE'
+    }
     if (!msg) msg = `Unerwarteter Fehler (HTTP ${res.status}).`
 
-    const err = new ApiError(msg, res.status, code, path)
+    const err = new ApiError(msg, res.status, code, path, details)
 
     if (res.status === 401 || res.status === 403) {
       // 401 heißt abgemeldet; 403 heißt angemeldet, aber nicht zuständig --
@@ -194,6 +239,7 @@ export const useApi = defineUseFunction(() => {
   return {
     request,
     requestBlob,
+    upload,
     get: <T>(path: string, o?: RequestOptions) => request<T>(path, o),
     post: <T>(path: string, body: unknown, o?: RequestOptions) =>
       request<T>(path, { ...o, method: 'POST', body }),
