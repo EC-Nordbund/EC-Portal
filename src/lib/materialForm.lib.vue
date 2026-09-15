@@ -64,48 +64,80 @@ v-dialog(v-model='offen', max-width='640px', persistent, scrollable)
           density='compact'
         )
 
-      //- Foto erst nach dem Anlegen: der Upload braucht die materialID.
-      template(v-if='materialID')
-        v-divider.my-4
-        .d-flex.align-center.ga-4
-          ec-material-foto(
-            :material-i-d='materialID',
-            :name='form.name',
-            :hat-foto='hatFoto',
-            :foto-stand='fotoStand',
-            :size='96'
-          )
-          div
-            .text-subtitle-2 Foto
-            .text-caption.text-medium-emphasis.mb-2
-              | Wird im Browser verkleinert (max. 1200 px), das Original bleibt bei dir.
-            .d-flex.flex-wrap.ga-2
-              v-btn(
-                size='small',
-                variant='tonal',
-                prepend-icon='photo_camera',
-                :loading='laedtFoto',
-                :disabled='laedt',
-                @click='dateiInput?.click()'
-              ) {{ hatFoto ? 'Foto ersetzen' : 'Foto hochladen' }}
-              v-btn(
-                v-if='hatFoto',
-                size='small',
-                variant='text',
-                color='error',
-                prepend-icon='delete',
-                :disabled='laedt || laedtFoto',
-                @click='fotoEntfernen'
-              ) Entfernen
-        input(
-          ref='dateiInput',
-          type='file',
-          accept='image/*',
-          style='display: none',
-          @change='dateiGewaehlt'
+      //- Foto: bei bestehendem Material sofort hochladen; bei neuem Material
+      //- wird es zwischengehalten und nach dem Anlegen mit der frischen ID
+      //- hochgeladen -- vom Handy aus in einem Rutsch fotografieren und anlegen.
+      v-divider.my-4
+      .d-flex.align-center.ga-4
+        v-avatar(v-if='wartendeVorschau', :size='96', rounded)
+          v-img(:src='wartendeVorschau', cover, :alt='form.name')
+        ec-material-foto(
+          v-else-if='materialID',
+          :material-i-d='materialID',
+          :name='form.name',
+          :hat-foto='hatFoto',
+          :foto-stand='fotoStand',
+          :size='96'
         )
-      v-alert.mt-4(v-else, type='info', variant='tonal', density='compact')
-        | Ein Foto kannst du nach dem Anlegen hinzufügen.
+        v-avatar(v-else, :size='96', rounded, color='grey-lighten-3')
+          v-icon(color='grey', size='40') image_not_supported
+        div
+          .text-subtitle-2 Foto
+          .text-caption.text-medium-emphasis.mb-2
+            span(v-if='wartendeVorschau') Wird beim Anlegen mit hochgeladen.
+            span(v-else) Wird im Browser verkleinert (max. 1200 px), das Original bleibt bei dir.
+          .d-flex.flex-wrap.ga-2
+            //- Zwei Eingänge: „Aufnehmen“ öffnet auf dem Handy direkt die
+            //- Kamera (capture), „Auswählen“ die Galerie. Am Rechner öffnen
+            //- beide den Dateidialog.
+            v-btn(
+              size='small',
+              variant='tonal',
+              prepend-icon='photo_camera',
+              :loading='laedtFoto',
+              :disabled='laedt',
+              @click='kameraInput?.click()'
+            ) Aufnehmen
+            v-btn(
+              size='small',
+              variant='tonal',
+              prepend-icon='photo_library',
+              :loading='laedtFoto',
+              :disabled='laedt',
+              @click='dateiInput?.click()'
+            ) {{ hatFoto || wartendeVorschau ? 'Anderes wählen' : 'Auswählen' }}
+            v-btn(
+              v-if='wartendeVorschau',
+              size='small',
+              variant='text',
+              prepend-icon='close',
+              :disabled='laedt',
+              @click='wartendesVerwerfen'
+            ) Verwerfen
+            v-btn(
+              v-else-if='hatFoto',
+              size='small',
+              variant='text',
+              color='error',
+              prepend-icon='delete',
+              :disabled='laedt || laedtFoto',
+              @click='fotoEntfernen'
+            ) Entfernen
+      input(
+        ref='kameraInput',
+        type='file',
+        accept='image/*',
+        capture='environment',
+        style='display: none',
+        @change='dateiGewaehlt'
+      )
+      input(
+        ref='dateiInput',
+        type='file',
+        accept='image/*',
+        style='display: none',
+        @change='dateiGewaehlt'
+      )
     v-card-actions
       v-spacer
       v-btn(variant='text', :disabled='laedt', @click='abbrechen') {{ materialID ? 'Schließen' : 'Abbrechen' }}
@@ -133,10 +165,12 @@ import type {
 /**
  * Anlegen und Bearbeiten eines Materials, inklusive Foto.
  *
- * Das Foto hängt an der materialID und geht deshalb erst nach dem Anlegen --
- * der Dialog bleibt nach „Anlegen“ offen und wechselt in den Bearbeiten-
- * Modus, damit man das Foto gleich nachschieben kann. Verkleinert wird im
- * Browser (bild.util.ts), zwei Fassungen: Foto und Vorschau.
+ * Das Foto hängt an der materialID. Bei bestehendem Material geht es sofort
+ * hoch; bei neuem Material wird es im Browser schon verkleinert, zwischen-
+ * gehalten und direkt nach dem Anlegen mit der frischen ID hochgeladen --
+ * vom Handy aus also fotografieren und anlegen in einem Schritt (Wunsch aus
+ * der Materialverwaltung). Verkleinert wird im Browser (bild.util.ts), zwei
+ * Fassungen: Foto und Vorschau.
  */
 const emit = defineEmits<{ (e: 'gespeichert', materialID: number): void }>()
 const api = useApi()
@@ -166,6 +200,16 @@ const materialID = ref<number | null>(null)
 const hatFoto = ref(false)
 const fotoStand = ref<number | null>(null)
 const dateiInput = ref<HTMLInputElement | null>(null)
+const kameraInput = ref<HTMLInputElement | null>(null)
+
+type Aufbereitet = Awaited<ReturnType<typeof materialFotoAufbereiten>>
+/** Bei neuem Material: das schon verkleinerte Foto, das nach dem Anlegen hochgeht. */
+const wartendesFoto = ref<Aufbereitet | null>(null)
+const wartendeVorschau = computed(() =>
+  wartendesFoto.value
+    ? `data:image/jpeg;base64,${wartendesFoto.value.vorschau.base64}`
+    : null
+)
 
 const form = reactive({
   name: '',
@@ -190,11 +234,33 @@ function show(m: MaterialVerwaltung | null) {
   // Neues Material ist standardmäßig freigegeben: es gibt nur die eine
   // Rolle, wer anlegt, gibt auch frei. Wer erst prüfen will, schaltet ab.
   form.freigegeben = m?.freigegeben ?? true
+  wartendesFoto.value = null
   offen.value = true
 }
 
 function abbrechen() {
+  wartendesFoto.value = null
   offen.value = false
+}
+
+function wartendesVerwerfen() {
+  wartendesFoto.value = null
+}
+
+/** Foto und Vorschau zur API; wirft bei Fehlern, damit der Aufrufer entscheidet. */
+async function fotoHochladen(id: number, bild: Aufbereitet) {
+  await api.request(`/portal/material/verwaltung/material/${id}/foto`, {
+    method: 'PUT',
+    body: {
+      mimetype: bild.foto.mimetype,
+      inhalt: bild.foto.base64,
+      vorschau: bild.vorschau.base64
+    },
+    quiet: true
+  })
+  hatFoto.value = true
+  fotoStand.value = Math.floor(Date.now() / 1000)
+  setze(id, `data:image/jpeg;base64,${bild.vorschau.base64}`)
 }
 
 async function speichern() {
@@ -225,9 +291,24 @@ async function speichern() {
         { quiet: true }
       )
       materialID.value = res.materialID
-      notifyInfo(
-        `„${body.name}“ angelegt. Du kannst jetzt ein Foto hinzufügen.`
-      )
+      const bild = wartendesFoto.value
+      if (bild) {
+        // Material ist angelegt; scheitert nur das Foto, bleibt der Dialog im
+        // Bearbeiten-Modus offen, damit man es erneut versuchen kann.
+        try {
+          await fotoHochladen(res.materialID, bild)
+          wartendesFoto.value = null
+        } catch (err: any) {
+          emit('gespeichert', res.materialID)
+          error({
+            text: `„${body.name}“ ist angelegt, aber das Foto konnte nicht gespeichert werden: ${err.message || err}`,
+            title: 'Foto fehlt'
+          })
+          return
+        }
+      }
+      notifyInfo(`„${body.name}“ angelegt.`)
+      offen.value = false
       emit('gespeichert', res.materialID)
     }
   } catch (err: any) {
@@ -243,7 +324,7 @@ async function speichern() {
 async function dateiGewaehlt(e: Event) {
   const input = e.target as HTMLInputElement
   const datei = input.files?.[0]
-  if (!datei || !materialID.value) {
+  if (!datei) {
     input.value = ''
     return
   }
@@ -252,22 +333,13 @@ async function dateiGewaehlt(e: Event) {
     // Erst lesen, dann das Input leeren (unten im finally): Chromium gibt den
     // Dateiinhalt sonst frei, bevor er dekodiert ist -- "Bild lässt sich
     // nicht lesen", obwohl die Datei in Ordnung war.
-    const { foto, vorschau } = await materialFotoAufbereiten(datei)
-    await api.request(
-      `/portal/material/verwaltung/material/${materialID.value}/foto`,
-      {
-        method: 'PUT',
-        body: {
-          mimetype: foto.mimetype,
-          inhalt: foto.base64,
-          vorschau: vorschau.base64
-        },
-        quiet: true
-      }
-    )
-    hatFoto.value = true
-    fotoStand.value = Math.floor(Date.now() / 1000)
-    setze(materialID.value, `data:image/jpeg;base64,${vorschau.base64}`)
+    const bild = await materialFotoAufbereiten(datei)
+    if (!materialID.value) {
+      // Neues Material: zwischenhalten, Upload folgt beim Anlegen.
+      wartendesFoto.value = bild
+      return
+    }
+    await fotoHochladen(materialID.value, bild)
     notifyInfo('Foto gespeichert.')
     emit('gespeichert', materialID.value)
   } catch (err: any) {
