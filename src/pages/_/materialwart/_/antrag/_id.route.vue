@@ -137,6 +137,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useApi } from '../../../../../plugins/api'
 import { useDialog } from '../../../../../plugins/dialog'
 import { useRouter } from '../../../../../plugins/router'
+import { useMaterialFotos } from '../../../../../util/materialFoto.util'
 import {
   STATUS_FARBE,
   STATUS_TEXT,
@@ -194,6 +195,9 @@ function datum(iso: string, obj: ApiDatum | null) {
 }
 
 function mengeGueltig(v: unknown, p: AntragPosition) {
+  // Ein geleertes Feld liefert '' -- Number('') wäre 0 und hieße "gestrichen".
+  // Das darf nur eine bewusst eingetippte 0 bedeuten.
+  if (v === '' || v === null || v === undefined) return false
   const n = Number(v)
   return Number.isInteger(n) && n >= 0 && n <= p.menge
 }
@@ -310,6 +314,8 @@ async function ladeBestand() {
 }
 
 watch(id, laden, { immediate: true })
+// Vorschauen aus dem Sitzungs-Cache; der Mail-Link führt direkt hierher.
+useMaterialFotos().laden()
 
 function zurueck() {
   if (window.history.length > 1) router.back()

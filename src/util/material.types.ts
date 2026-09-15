@@ -153,6 +153,7 @@ export interface BelegungMaterial {
   bestand: number
   aktiv: boolean
   freigegeben: boolean
+  hatFoto: boolean
   reservierungen: Reservierung[]
   /** Höchste gleichzeitig genehmigte Menge an einem Tag des Fensters. */
   maxBelegt: number

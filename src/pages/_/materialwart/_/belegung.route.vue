@@ -52,7 +52,7 @@ div
         v-divider(v-if='i > 0')
         v-list-item
           template(#prepend)
-            ec-material-foto(:material-i-d='m.materialID', :name='m.name', :size='40', :hat-foto='true')
+            ec-material-foto(:material-i-d='m.materialID', :name='m.name', :size='40', :hat-foto='m.hatFoto')
           v-list-item-title
             | {{ m.name }}
             span.text-caption.text-medium-emphasis.ml-2(v-if='m.kategorie') {{ m.kategorie }}
@@ -95,6 +95,7 @@ import { computed, ref, watch } from 'vue'
 import { useApi } from '../../../../plugins/api'
 import { useRouter } from '../../../../plugins/router'
 import filterGenerator from '../../../../util/filter.util'
+import { useMaterialFotos } from '../../../../util/materialFoto.util'
 import {
   STATUS_FARBE,
   STATUS_TEXT,
@@ -234,6 +235,9 @@ async function laden() {
 }
 
 watch([von, bis], laden, { immediate: true })
+// Vorschauen kommen aus dem Sitzungs-Cache; wer per Mail-Link direkt hier
+// landet, hat ihn noch nicht gefüllt.
+useMaterialFotos().laden()
 </script>
 
 <style scoped>

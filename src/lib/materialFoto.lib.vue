@@ -30,7 +30,7 @@ v-dialog(v-model='offen', max-width='900')
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useApi } from '../plugins/api'
 import { useMaterialFotos } from '../util/materialFoto.util'
 
@@ -89,5 +89,7 @@ function freigeben() {
   vollbild.value = null
 }
 
+// Neues Foto hochgeladen -> alter Object-URL ist veraltet.
+watch(() => props.fotoStand, freigeben)
 onBeforeUnmount(freigeben)
 </script>
