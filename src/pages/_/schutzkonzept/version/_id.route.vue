@@ -224,6 +224,15 @@ ec-wrapper(
                   :hint='auswahl.obj.typ === "checkbox" ? "Pflicht-Checkbox = muss angekreuzt werden (Zustimmung)." : ""',
                   :persistent-hint='auswahl.obj.typ === "checkbox"'
                 )
+              v-alert.mb-2(
+                v-if='auswahl.obj.typ === "foto"',
+                type='info',
+                variant='tonal',
+                density='compact'
+              )
+                | Der Browser verkleinert das Bild vor dem Speichern auf höchstens
+                | {{ FOTO_MAX_PX }} px (JPEG). Es liegt dann in den Antworten des Kreises
+                | und kommt per IMAGE-Platzhalter (siehe unten) in die DOCX.
               v-textarea(
                 :label='auswahl.obj.typ === "info" ? "Text" : "Hilfetext"',
                 v-model='auswahl.obj.hilfe',
@@ -567,6 +576,11 @@ ec-wrapper(
                   | Bedingungen:
                   code.ml-1 {{ hilfe.bedingung }}
                 li
+                  | Foto (Breite und Höhe in cm, die runden Klammern sind Pflicht):
+                  code.ml-1 {{ hilfe.foto }}
+                  | . Ohne Foto bleibt die Stelle leer; wer stattdessen etwas anderes zeigen will:
+                  code.ml-1 {{ hilfe.fotoBedingt }}
+                li
                   | Metadaten:
                   code.ml-1 meta_kreis, meta_datum, meta_stand_version, meta_formular_version, meta_entwurf
         v-expansion-panel(title='Alle Platzhalter dieser Formularversion')
@@ -684,6 +698,7 @@ import { datum, datumZeit, groesse } from '../../../../schutzkonzept/format'
 import {
   ERINNERUNG_STANDARD_TAGE,
   FELD_TYPEN,
+  FOTO_MAX_PX,
   GRENZEN,
   META_KEYS,
   RELATIV_MAX_JAHRE,
@@ -1488,6 +1503,7 @@ const typIcon = (typ: FeldTyp) =>
     multiselect: 'checklist',
     checkbox: 'check_box',
     info: 'info',
+    foto: 'photo_camera',
     gruppe: 'table_chart'
   })[typ]
 
@@ -1500,6 +1516,15 @@ function platzhalterFuer(f: Feld, gruppe?: Feld): string[] {
       `{{FOR eintrag IN ${f.key}}}`,
       '{{$eintrag.spalte}}',
       '{{END-FOR eintrag}}'
+    ]
+  }
+  if (f.typ === 'foto') {
+    // Breite/Hoehe in cm; `data` und `extension` liefert die DOCX-Ausgabe.
+    // Die runden Klammern sind Pflicht: docx-templates wertet per eval aus,
+    // ein nacktes `{...}` waere dort ein Block und das Bild fehlte still.
+    const n = (name: string) => (gruppe ? `$eintrag.${name}` : name)
+    return [
+      `{{IMAGE ({width: 4, height: 5, data: ${n(f.key)}, extension: ${n(`${f.key}_extension`)}})}}`
     ]
   }
   const liste = [k(f.key)]
@@ -1516,6 +1541,7 @@ const bekannteSchluessel = computed(() => {
       for (const f of a.felder) {
         if (f.typ === 'info' || !f.key) continue
         s.add(f.key)
+        if (f.typ === 'foto') s.add(`${f.key}_extension`)
         for (const o of f.optionen) s.add(`${f.key}_${o.key}`)
       }
     }
@@ -1531,6 +1557,12 @@ const allePlatzhalter = computed(() => {
         if (f.typ === 'info' || !f.key) continue
         const typ = FELD_TYPEN.find((t) => t.typ === f.typ)?.label ?? f.typ
         out.push({ name: f.key, herkunft: `${b.titel} › ${f.label} (${typ})` })
+        if (f.typ === 'foto') {
+          out.push({
+            name: `${f.key}_extension`,
+            herkunft: `Dateityp des Fotos „${f.label}“ (.jpg/.png) für IMAGE`
+          })
+        }
         for (const o of f.optionen) {
           out.push({
             name: `${f.key}_${o.key}`,
@@ -1542,6 +1574,12 @@ const allePlatzhalter = computed(() => {
             name: `$eintrag.${s.key}`,
             herkunft: `Spalte „${s.label}“ in FOR eintrag IN ${f.key}`
           })
+          if (s.typ === 'foto') {
+            out.push({
+              name: `$eintrag.${s.key}_extension`,
+              herkunft: `Dateityp des Fotos in Spalte „${s.label}“`
+            })
+          }
           for (const o of s.optionen) {
             out.push({
               name: `$eintrag.${s.key}_${o.key}`,
@@ -1566,7 +1604,10 @@ const hilfe = {
   spaltenStart: '{{FOR raum IN gruppenraeume}}',
   spaltenInhalt: '{{$raum.name}} / {{$raum.einsehbar}}',
   spaltenEnde: '{{END-FOR raum}}',
-  bedingung: '{{IF uebernachtung_ja}} … {{END-IF}}'
+  bedingung: '{{IF uebernachtung_ja}} … {{END-IF}}',
+  foto: '{{IMAGE ({width: 4, height: 5, data: foto, extension: foto_extension})}}',
+  fotoBedingt:
+    '{{IMAGE foto ? {width: 4, height: 5, data: foto, extension: foto_extension} : null}}'
 }
 
 /* ------------------------------------------------------------ Prüfung --- */

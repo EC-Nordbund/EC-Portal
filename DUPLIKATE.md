@@ -63,10 +63,12 @@ demselben Code -- Änderungen deshalb immer in allen Kopien spiegeln.
 | `src/schutzkonzept/definition.ts` | `EC-Api/src/schutzkonzept/definition.ts`, `schutzkonzept/src/schutzkonzept/definition.ts` | ja |
 | `src/schutzkonzept/feld.vue` | `schutzkonzept/src/schutzkonzept/feld.vue` | ja |
 | `src/schutzkonzept/abschnitt.vue` | `schutzkonzept/src/schutzkonzept/abschnitt.vue` | ja |
+| `src/util/bild.util.ts` | `schutzkonzept/src/util/bild.util.ts` | ja (bis auf Kopfkommentar) – `feld.vue` verkleinert damit Fotos |
 
 ```bash
 diff src/schutzkonzept/definition.ts ../EC-Api/src/schutzkonzept/definition.ts
 diff -r src/schutzkonzept ../schutzkonzept/src/schutzkonzept
+diff src/util/bild.util.ts ../schutzkonzept/src/util/bild.util.ts
 ```
 
 `src/schutzkonzept/format.ts` gehört nur dem Portal.
