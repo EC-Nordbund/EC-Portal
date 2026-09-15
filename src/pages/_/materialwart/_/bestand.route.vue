@@ -80,7 +80,7 @@ div
           .text-caption.text-medium-emphasis(v-if='m.beschreibung', style='max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis') {{ m.beschreibung }}
         td {{ m.kategorie || '—' }}
         td
-          v-chip(size='x-small', variant='tonal', :color='m.bereich === "referenten" ? "info" : undefined') {{ m.bereich === 'referenten' ? 'Referenten' : 'Allgemein' }}
+          v-chip(size='x-small', variant='tonal', :color='m.bereich === "referenten" ? "info" : undefined') {{ m.bereich === 'referenten' ? 'Speziell' : 'Allgemein' }}
         td.text-right {{ m.bestand }}
         td {{ m.lagerort || '—' }}
         td
@@ -153,7 +153,7 @@ const kategorienDialog =
 const BEREICH_ITEMS = [
   { value: 'alle', title: 'Alle Bereiche' },
   { value: 'allgemein', title: 'Allgemein' },
-  { value: 'referenten', title: 'Referenten' }
+  { value: 'referenten', title: 'Speziell' }
 ]
 
 const suche = ref('')
@@ -206,7 +206,7 @@ function csv() {
       m.materialID,
       m.name,
       m.kategorie ?? '',
-      m.bereich === 'referenten' ? 'Referenten' : 'Allgemein',
+      m.bereich === 'referenten' ? 'Speziell' : 'Allgemein',
       m.bestand,
       m.lagerort,
       m.beschreibung,

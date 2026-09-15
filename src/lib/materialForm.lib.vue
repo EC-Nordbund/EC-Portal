@@ -21,7 +21,7 @@ v-dialog(v-model='offen', max-width='640px', persistent, scrollable)
             label='Bereich',
             :items='BEREICHE',
             style='min-width: 220px; flex: 1',
-            hint='„Referenten“ sehen nur Freizeitleitung und Materialwarte',
+            hint='„Speziell“ sehen nur Freizeitleitung und Materialwarte',
             persistent-hint
           )
           v-select(
@@ -145,7 +145,8 @@ const { setze } = useMaterialFotos()
 
 const BEREICHE = [
   { value: 'allgemein', title: 'Allgemein – für alle Portal-Nutzer' },
-  { value: 'referenten', title: 'Referenten und Freizeitleitung' }
+  // Der DB-Wert heisst weiter 'referenten'; nach aussen ist der Bereich „Speziell“.
+  { value: 'referenten', title: 'Speziell' }
 ]
 
 const props = defineProps<{ kategorien: MaterialKategorie[] }>()

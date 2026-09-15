@@ -47,7 +47,7 @@ div
     )
       v-chip(value='alle', size='small', filter) Alles
       v-chip(value='allgemein', size='small', filter) Allgemein
-      v-chip(value='referenten', size='small', filter) Referenten
+      v-chip(value='referenten', size='small', filter) Speziell
     v-spacer
     span.text-caption(v-if='material') {{ zaehler }}
     v-btn(
@@ -81,7 +81,7 @@ div
         )
       v-list-item-title
         | {{ m.name }}
-        v-chip.ml-2(v-if='m.bereich === "referenten"', size='x-small', variant='outlined') Referenten
+        v-chip.ml-2(v-if='m.bereich === "referenten"', size='x-small', variant='outlined') Speziell
       v-list-item-subtitle
         div(v-if='m.kategorie || m.lagerort') {{ untertitel(m) }}
         div(v-if='m.beschreibung') {{ m.beschreibung }}
@@ -288,7 +288,7 @@ function csv() {
     const z: unknown[] = [
       m.name,
       m.kategorie ?? '',
-      m.bereich === 'referenten' ? 'Referenten' : 'Allgemein',
+      m.bereich === 'referenten' ? 'Speziell' : 'Allgemein',
       m.bestand,
       m.lagerort,
       m.beschreibung
