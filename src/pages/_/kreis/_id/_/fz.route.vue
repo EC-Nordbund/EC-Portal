@@ -4,8 +4,17 @@ div
       ec-search(label='Person suchen', @suche='suche = $event')
       v-btn-toggle(v-model='ansicht', density='compact', mandatory, variant='outlined')
         v-btn(value='ampel', size='small') Relevante
-        v-btn(value='alle', size='small') Alle Personen
+        v-btn(value='alle', size='small') Alle Mitarbeitenden
       v-spacer
+      v-btn(
+        variant='flat',
+        v-accent-bg,
+        v-white,
+        size='small',
+        prepend-icon='person_add',
+        :disabled='!daten',
+        @click='neuDialog.show()'
+      ) Mitarbeiter/in
       v-btn(
         variant='text',
         size='small',
@@ -27,7 +36,10 @@ div
     v-if='daten && !gefiltert.length',
     type='info',
     variant='tonal'
-  ) Keine Personen in dieser Ansicht.
+  )
+    span(v-if='suche') Keine Person gefunden.
+    span(v-else-if='alle') In diesem EC-Kreis ist noch niemand als mitarbeitend eingetragen.
+    span(v-else) Keine Personen in dieser Ansicht.
 
   v-table(v-if='gefiltert.length', density='compact', hover)
     thead
@@ -59,7 +71,7 @@ div
           div(v-if='p.email') {{ p.email }}
           div(v-if='p.telefon') {{ p.telefon }}
           span(v-if='!p.email && !p.telefon') —
-        td.text-right
+        td.text-right.text-no-wrap
           v-btn(
             v-if='darfEintragen(p)',
             size='small',
@@ -67,13 +79,30 @@ div
             prepend-icon='verified_user',
             @click='fzDialog.show(p)'
           ) FZ
+          v-btn(
+            icon,
+            variant='text',
+            size='small',
+            :title='`${p.vorname} ${p.nachname} aus der Mitarbeiterliste entfernen`',
+            @click='entfernen(p)'
+          )
+            v-icon person_remove
 
   add-fz(ref='fzDialog', @gespeichert='laden')
+  neue-person(
+    v-if='daten',
+    ref='neuDialog',
+    art='mitarbeit',
+    :kreis-i-d='kreisID',
+    :kreis-name='daten.kreis.bezeichnung',
+    @gespeichert='nachAnlage'
+  )
 </template>
 
 <script setup lang="ts">
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import addFz from '../../../../../lib/addFz.lib.vue'
+import neuePerson from '../../../../../lib/neuePerson.lib.vue'
 import { useApi } from '../../../../../plugins/api'
 import { useRouter } from '../../../../../plugins/router'
 import type { PortalMe } from '../../../../../plugins/auth'
@@ -82,11 +111,18 @@ import saveBlob from '../../../../../util/download.util'
 import { useDialog } from '../../../../../plugins/dialog'
 
 /**
- * FZ-Liste eines EC-Kreises.
+ * Mitarbeiter- und FZ-Liste eines EC-Kreises.
+ *
+ * Hier stehen die Mitarbeitenden des Kreises — nicht seine Mitglieder. Wer wo
+ * Mitglied ist, pflegt die Ortsverantwortliche in der Mitgliederliste; das
+ * Führungszeugnis wird dort vorgezeigt, wo jemand mitarbeitet, und jemand kann
+ * in mehreren Kreisen mitarbeiten. Die FZ-Verantwortliche trägt deshalb hier
+ * selbst ein, wer mitarbeitet.
  *
  * Zwei Ansichten: "Relevante" zeigt genau die Auswahl der Monats-Mail, damit
- * Web-Ansicht und Excel dieselbe Menge zeigen. "Alle Personen" nimmt jede
- * Person des Kreises dazu, auch die ganz ohne FZ-Vorgang.
+ * Web-Ansicht und Excel dieselbe Menge zeigen. "Alle Mitarbeitenden" nimmt
+ * jede als mitarbeitend eingetragene Person dazu, auch die ganz ohne
+ * FZ-Vorgang.
  *
  * Der Umschalter hängt an einem Query-Parameter, steht also in der URL und
  * übersteht ein Neuladen.
@@ -96,6 +132,7 @@ const props = defineProps<{ me: PortalMe }>()
 const api = useApi()
 const { route, booleanQueryRef } = useRouter()
 const fzDialog = useTemplateRef<InstanceType<typeof addFz>>('fzDialog')
+const neuDialog = useTemplateRef<InstanceType<typeof neuePerson>>('neuDialog')
 
 const alle = booleanQueryRef('alle')
 const ansicht = computed({
@@ -105,7 +142,7 @@ const ansicht = computed({
   }
 })
 
-const { notifyInfo } = useDialog()
+const { error, notifyInfo } = useDialog()
 
 const suche = ref('')
 const qrLaeuft = ref(false)
@@ -145,6 +182,42 @@ async function laden() {
 }
 
 watch([kreisID, alle], laden, { immediate: true })
+
+/**
+ * Nach dem Hinzufügen in die Ansicht "Alle" wechseln: eine frisch
+ * eingetragene Person hat meist noch keinen FZ-Vorgang und wäre unter
+ * "Relevante" unsichtbar -- das sähe aus, als wäre nichts passiert.
+ * Der Wechsel löst über den Watcher das Neuladen aus.
+ */
+function nachAnlage() {
+  if (alle.value) laden()
+  else alle.value = true
+}
+
+function entfernen(p: any) {
+  if (
+    !window.confirm(
+      `${p.vorname} ${p.nachname} wirklich aus der Mitarbeiterliste entfernen?\n\nDie Person bleibt im System und behält ihre Mitgliedschaft; sie taucht nur in eurer FZ-Liste und der Monats-Mail nicht mehr auf.`
+    )
+  ) {
+    return
+  }
+  api
+    .request(`/portal/kreis/${kreisID.value}/mitarbeiter/${p.personID}`, {
+      method: 'DELETE',
+      quiet: true
+    })
+    .then(() => {
+      notifyInfo(`${p.vorname} ${p.nachname} entfernt.`)
+      laden()
+    })
+    .catch((err: any) =>
+      error({
+        text: err.message || String(err),
+        title: 'Entfernen fehlgeschlagen'
+      })
+    )
+}
 
 /**
  * CSV-Export mit BOM: ohne das öffnet Excel die Datei als Latin-1 und macht

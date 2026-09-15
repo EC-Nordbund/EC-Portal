@@ -1,8 +1,9 @@
 # EC-Portal
 
-Selbstbedienungs-Portal des EC-Nordbund für **Freizeitleiter** und
-**Ortsverantwortliche**: sie sehen ihre aktuellen Listen und tragen
-Führungszeugnisse für die Personen ein, für die sie zuständig sind.
+Selbstbedienungs-Portal des EC-Nordbund für **Freizeitleiter**,
+**FZ-Verantwortliche** und **Ortsverantwortliche**: sie sehen ihre aktuellen
+Listen und tragen Führungszeugnisse für die Personen ein, für die sie
+zuständig sind.
 
 Bis dahin liefen beide Wege über die Geschäftsstelle — Ortsverantwortliche
 bekamen einmal im Monat eine Excel-Liste per Mail, Freizeitleiter ihre
@@ -24,20 +25,28 @@ DEV_PORT=8092 API_BASE=http://localhost:4000 npm run dev
 
 Port 8092, weil 8080 (accountdesk), 8090 (EC-Verwaltung) und 8091 (deren
 HMR-Socket) belegt sind. Die API läuft über `dev/run-api.sh` auf 4000, das
-Datenbank-Schema liegt in `EC-Api/sql/portal-schema.sql`.
+Datenbank-Schema liegt in `EC-Api/sql/portal-schema.sql` und
+`EC-Api/sql/kreis-mitarbeit.sql`.
 
 Demo-Zugänge aus `dev/seed-demo.sql`, Passwort jeweils `Nordsee-Kutter-2026`:
 
 | E-Mail | Rolle |
 |---|---|
-| `doro.demo@example.org` | Ortsverantwortliche Neumünster **und** Hauptleitung Sommerfreizeit |
-| `max.muster@example.org` | nur Freizeitleiter (Pfingstcamp) |
-| `erika@example.org` | Ortsverantwortliche Kiel |
+| `doro.demo@example.org` | FZ-Verantwortliche Neumünster **und** Hauptleitung Sommerfreizeit |
+| `max.muster@example.org` | Ortsverantwortlicher Neumünster **und** Freizeitleiter (Pfingstcamp) |
+| `erika@example.org` | FZ-Verantwortliche Kiel; Mitglied in Kiel, arbeitet in Neumünster mit |
 | `greta@example.org` | Vollzugriff |
 | `fam.platzh@example.org` | Einladung offen — Link: `/#/passwort/setzen?token=demo-invite-token` |
 
 ## Was man wissen sollte
 
+- **Mitarbeit ist nicht Mitgliedschaft.** Mitglied ist man in genau einem
+  EC-Kreis (`personen.ecKreis`, pflegt die Ortsverantwortliche in der
+  Mitgliederliste). Mitarbeiten kann man in mehreren (`ecKreisMitarbeit`,
+  pflegt die FZ-Verantwortliche in „Mitarbeiter & FZ“) — und das
+  Führungszeugnis wird dort vorgezeigt, wo jemand mitarbeitet. Die beiden
+  Listen sind deshalb getrennte Personenmengen, und wer nur eine Rolle hat,
+  sieht nur die eine.
 - **Der Token ist ein anderer als der der Verwaltung.** Beide JWTs werden mit
   unterschiedlichen Secrets signiert. Das ist keine Kosmetik: `checkAuth` der
   API prüft nur die Signatur und kennt keine Rechte — mit gemeinsamem Secret

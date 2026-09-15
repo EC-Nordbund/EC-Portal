@@ -1,13 +1,20 @@
 <template lang="pug">
 v-dialog(v-model='offen', max-width='560px', persistent, scrollable)
   v-card
-    v-card-title Person hinzufügen
+    v-card-title {{ art === 'mitarbeit' ? 'Mitarbeiter/in hinzufügen' : 'Person hinzufügen' }}
     v-card-subtitle {{ kreisName }}
     v-card-text
       v-alert.mb-4(type='info', variant='tonal', density='compact')
         | Gibt es die Person schon im System, wird sie übernommen statt neu
         | angelegt. Name und Geburtsdatum entscheiden darüber — bitte genau
         | eintragen.
+        template(v-if='art === "mitarbeit"')
+          |  Eine Mitgliedschaft in einem anderen EC-Kreis bleibt unberührt —
+          | die Person wird nur bei euch als mitarbeitend eingetragen.
+        template(v-else)
+          |  Wer hier steht, ist Mitglied. Wer im Kreis mitarbeitet und ein
+          | Führungszeugnis braucht, trägt die/der FZ-Verantwortliche in der
+          | Mitarbeiterliste ein.
       v-form(v-model='valid')
         .d-flex.ga-4.flex-wrap
           v-text-field(
@@ -39,6 +46,7 @@ v-dialog(v-model='offen', max-width='560px', persistent, scrollable)
             :rules='[pflicht]'
           )
         v-select.mt-2(
+          v-if='art === "mitglied"',
           label='Mitgliedsstatus',
           v-model='daten.ecMitglied',
           :items='statusItems'
@@ -83,12 +91,16 @@ v-dialog(v-model='offen', max-width='560px', persistent, scrollable)
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useApi } from '../plugins/api'
 import { useDialog } from '../plugins/dialog'
 
 /**
- * „+ Neu" in der Mitgliederliste.
+ * „+ Neu" in der Mitgliederliste (art = 'mitglied') und „+ Mitarbeiter/in"
+ * in der FZ-Liste (art = 'mitarbeit'). Gleicher Dialog, zwei Endpunkte:
+ * Als Mitglied zieht eine bestehende Person in diesen Kreis um; als
+ * Mitarbeiterin wird sie nur zusätzlich eingetragen, ihre Mitgliedschaft
+ * bleibt, wo sie ist.
  *
  * Die Dublettenprüfung passiert serverseitig und folgt der Logik der
  * Website-Anmeldung: erst exakt auf Name und Geburtsdatum suchen, dann in der
@@ -100,11 +112,15 @@ export interface StatusOption {
   bezeichnung: string
 }
 
-const props = defineProps<{
-  kreisID: number
-  kreisName: string
-  status: StatusOption[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    kreisID: number
+    kreisName: string
+    art?: 'mitglied' | 'mitarbeit'
+    status?: StatusOption[]
+  }>(),
+  { art: 'mitglied', status: () => [] }
+)
 const emit = defineEmits<{ (e: 'gespeichert'): void }>()
 
 const api = useApi()
@@ -129,7 +145,7 @@ const leer = () => ({
 })
 const daten = ref(leer())
 
-const statusItems = ref(
+const statusItems = computed(() =>
   props.status.map((s) => ({
     value: s.ecMitgliedStatusID,
     title: s.bezeichnung
@@ -149,18 +165,23 @@ function speichern() {
   if (!valid.value || laedt.value) return
   laedt.value = true
   api
-    .post<{ art: string; vorherigerKreis: { bezeichnung: string } | null }>(
-      `/portal/kreis/${props.kreisID}/mitglied`,
+    .post<{ art: string; vorherigerKreis?: { bezeichnung: string } | null }>(
+      `/portal/kreis/${props.kreisID}/${props.art === 'mitarbeit' ? 'mitarbeiter' : 'mitglied'}`,
       daten.value,
       { quiet: true }
     )
     .then((res) => {
       offen.value = false
+      const name = `${daten.value.vorname} ${daten.value.nachname}`
       // Was passiert ist, gehört auf den Tisch: nur so merkt jemand, dass er
       // gerade eine bestehende Person übernommen statt neu angelegt hat.
       if (res.art === 'neu') {
+        notifyInfo(`${name} hinzugefügt.`)
+      } else if (res.art === 'bereits') {
+        notifyInfo(`${name} ist bei euch bereits als mitarbeitend eingetragen.`)
+      } else if (props.art === 'mitarbeit') {
         notifyInfo(
-          `${daten.value.vorname} ${daten.value.nachname} hinzugefügt.`
+          `${name} war bereits im System und ist jetzt bei euch als mitarbeitend eingetragen.`
         )
       } else if (res.art === 'umgezogen') {
         notifyInfo(

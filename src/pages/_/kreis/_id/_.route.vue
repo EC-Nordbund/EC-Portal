@@ -19,8 +19,11 @@ import { useRouter } from '../../../../plugins/router'
  * Rahmen eines EC-Kreises.
  *
  * Ein Kreis hat zwei getrennte Aufgaben mit je eigener Verantwortlicher:
- * Führungszeugnisse und Mitgliederpflege. Wer nur eine davon hat, sieht auch
- * nur eine — die Navigation unten erscheint dann gar nicht erst.
+ * Mitarbeitende samt Führungszeugnissen (FZ-Verantwortliche) und die
+ * Mitgliederliste (Ortsverantwortliche). Beides sind getrennte Personenmengen:
+ * Mitglied ist man in genau einem Kreis, mitarbeiten kann man in mehreren.
+ * Wer nur eine Aufgabe hat, sieht auch nur eine — die Navigation unten
+ * erscheint dann gar nicht erst.
  */
 const props = defineProps<{ me: PortalMe }>()
 const { route } = useRouter()
@@ -33,9 +36,11 @@ const kreis = computed(
 const untertitel = computed(() => {
   const r = kreis.value?.rollen ?? []
   if (r.includes('fz') && r.includes('ort')) {
-    return 'Führungszeugnisse und Mitglieder'
+    return 'Mitarbeitende, Führungszeugnisse und Mitglieder'
   }
-  return r.includes('ort') ? 'Mitglieder' : 'Führungszeugnisse'
+  return r.includes('ort')
+    ? 'Mitglieder'
+    : 'Mitarbeitende und Führungszeugnisse'
 })
 
 const nav = computed(() => {
@@ -44,7 +49,7 @@ const nav = computed(() => {
   if (r.includes('fz')) {
     punkte.push({
       icon: 'verified_user',
-      label: 'Führungszeugnisse',
+      label: 'Mitarbeiter & FZ',
       to: `/kreis/${id.value}/fz`
     })
   }
