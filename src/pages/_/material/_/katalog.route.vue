@@ -23,6 +23,7 @@ div
           style='max-width: 190px'
         )
         span.text-caption(v-if='zeitraum') Verfügbarkeit für {{ zeitraumText }}
+        span.text-caption.text-error(v-else-if='zeitraumFehler') {{ zeitraumFehler }}
         span.text-caption(v-else-if='von || bis') Bitte beide Daten angeben.
         span.text-caption(v-else) Zeitraum wählen, um zu sehen, was frei ist.
 
@@ -49,6 +50,13 @@ div
       v-chip(value='referenten', size='small', filter) Referenten
     v-spacer
     span.text-caption(v-if='material') {{ zaehler }}
+    v-btn(
+      variant='text',
+      size='small',
+      prepend-icon='download',
+      :disabled='!gefiltert.length',
+      @click='csv'
+    ) CSV
 
   v-progress-linear(v-if='laedtGerade', indeterminate, color='primary')
 
@@ -150,6 +158,7 @@ import type { PortalMe } from '../../../../plugins/auth'
 import { useRouter } from '../../../../plugins/router'
 import { useStorage } from '../../../../storage'
 import filterGenerator from '../../../../util/filter.util'
+import { csvExport, heuteISO } from '../../../../util/csv.util'
 import { useMaterialFotos } from '../../../../util/materialFoto.util'
 import type { Material, Stammdaten } from '../../../../util/material.types'
 
@@ -190,9 +199,38 @@ const abgewiesen = ref('')
 /** materialID -> Menge */
 const auswahl = reactive(new Map<number, number>())
 
-/** Nur ein vollständiger, plausibler Zeitraum zählt. */
+/** Dieselben Grenzen wie die API (MAX_ZEITRAUM_TAGE in EC-Api src/material/config.ts). */
+const MAX_TAGE = 366
+
+function tageZwischen(a: string, b: string) {
+  const [aj, am, at] = a.split('-').map(Number)
+  const [bj, bm, bt] = b.split('-').map(Number)
+  return Math.round(
+    (Date.UTC(bj, bm - 1, bt) - Date.UTC(aj, am - 1, at)) / 86400000
+  )
+}
+
+/**
+ * Warum der eingetippte Zeitraum nicht taugt -- oder leer. Die Prüfung läuft
+ * hier und nicht erst in der API: das Datumsfeld lässt jede Eingabe zu (die
+ * min-Grenze hält nur den Picker auf), und ein Tippfehler im Jahr ließ vorher
+ * die ganze Liste hinter einer Fehlermeldung verschwinden.
+ */
+const zeitraumFehler = computed(() => {
+  if (!von.value || !bis.value) return ''
+  if (von.value < heute)
+    return 'Der Zeitraum darf nicht in der Vergangenheit beginnen.'
+  if (bis.value < von.value) return 'Das Ende liegt vor dem Anfang.'
+  // Wie die API: Differenz der Tage, nicht die inklusive Anzahl.
+  if (tageZwischen(von.value, bis.value) > MAX_TAGE) {
+    return `Ein Zeitraum darf höchstens ${MAX_TAGE} Tage umfassen.`
+  }
+  return ''
+})
+
+/** Nur ein vollständiger, plausibler Zeitraum zählt; sonst lädt die Liste ohne Verfügbarkeit. */
 const zeitraum = computed(() => {
-  if (!von.value || !bis.value || bis.value < von.value) return null
+  if (!von.value || !bis.value || zeitraumFehler.value) return null
   return { von: von.value, bis: bis.value }
 })
 
@@ -233,6 +271,40 @@ const gefiltert = computed(() => {
     })
   )
 })
+
+/** Exportiert, was gerade gefiltert zu sehen ist -- mit Verfügbarkeit, falls ein Zeitraum gewählt ist. */
+function csv() {
+  const mitZeitraum = !!zeitraum.value
+  const kopf = [
+    'Name',
+    'Kategorie',
+    'Bereich',
+    'Bestand',
+    'Lagerort',
+    'Beschreibung'
+  ]
+  if (mitZeitraum) kopf.push('Zeitraum', 'Reserviert', 'Angefragt', 'Frei')
+  const zeilen = gefiltert.value.map((m) => {
+    const z: unknown[] = [
+      m.name,
+      m.kategorie ?? '',
+      m.bereich === 'referenten' ? 'Referenten' : 'Allgemein',
+      m.bestand,
+      m.lagerort,
+      m.beschreibung
+    ]
+    if (mitZeitraum) {
+      z.push(
+        zeitraumText.value,
+        m.reserviert ?? '',
+        m.angefragt ?? '',
+        m.frei ?? ''
+      )
+    }
+    return z
+  })
+  csvExport(`Material-${heuteISO()}`, kopf, zeilen)
+}
 
 const zaehler = computed(() => {
   const alle = material.value?.length ?? 0

@@ -32,6 +32,7 @@ div
     )
     v-spacer
     ec-search(label='Material oder Anlass', @suche='suche = $event')
+    v-btn(variant='text', size='small', prepend-icon='download', :disabled='!gefiltert.length', @click='csv') CSV
 
   v-progress-linear(v-if='laedt', indeterminate, color='primary')
 
@@ -95,6 +96,7 @@ import { computed, ref, watch } from 'vue'
 import { useApi } from '../../../../plugins/api'
 import { useRouter } from '../../../../plugins/router'
 import filterGenerator from '../../../../util/filter.util'
+import { csvExport } from '../../../../util/csv.util'
 import { useMaterialFotos } from '../../../../util/materialFoto.util'
 import {
   STATUS_FARBE,
@@ -160,6 +162,58 @@ const gefiltert = computed(() =>
     .filter(filterGenerator(suche.value))
 )
 
+/**
+ * Eine Zeile je Reservierung; Material ohne Reservierung im Fenster bekommt
+ * eine Zeile mit leeren Reservierungsfeldern, damit die Liste vollständig ist.
+ */
+function csv() {
+  const zeilen: unknown[][] = []
+  for (const m of gefiltert.value) {
+    const basis = [
+      m.name,
+      m.kategorie ?? '',
+      m.bestand,
+      m.maxBelegt,
+      m.ueberbucht ? 'ja' : 'nein'
+    ]
+    if (!m.reservierungen.length) {
+      zeilen.push([...basis, '', '', '', '', '', '', ''])
+      continue
+    }
+    for (const r of m.reservierungen) {
+      zeilen.push([
+        ...basis,
+        r.materialAntragID,
+        STATUS_TEXT[r.status],
+        r.vonObj?.german ?? r.von,
+        r.bisObj?.german ?? r.bis,
+        r.menge,
+        r.anlass,
+        r.antragsteller
+      ])
+    }
+  }
+  const z = daten.value?.zeitraum
+  csvExport(
+    `Belegung-${z?.von ?? von.value}-bis-${z?.bis ?? bis.value}`,
+    [
+      'Material',
+      'Kategorie',
+      'Bestand',
+      'Max. belegt',
+      'Überbucht',
+      'Antrag Nr',
+      'Status',
+      'Von',
+      'Bis',
+      'Menge',
+      'Anlass',
+      'Antragsteller/in'
+    ],
+    zeilen
+  )
+}
+
 const zaehler = computed(() => {
   const alle = daten.value?.material ?? []
   const belegt = alle.filter((m) => m.reservierungen.length > 0).length
@@ -216,6 +270,18 @@ async function laden() {
   )
     return
   if (bis.value < von.value) return
+  // Grenze der API (MAX_ZEITRAUM_TAGE) schon hier prüfen: ein Tippfehler im
+  // Jahr soll einen Hinweis geben, keinen Fehler vom Server.
+  const [vj, vm, vt] = von.value.split('-').map(Number)
+  const [bj, bm, bt] = bis.value.split('-').map(Number)
+  const tage = Math.round(
+    (Date.UTC(bj, bm - 1, bt) - Date.UTC(vj, vm - 1, vt)) / 86400000
+  )
+  if (tage > 366) {
+    abgewiesen.value =
+      'Ein Zeitraum darf höchstens 366 Tage umfassen – bitte das Datum prüfen.'
+    return
+  }
   laedt.value = true
   abgewiesen.value = ''
   try {

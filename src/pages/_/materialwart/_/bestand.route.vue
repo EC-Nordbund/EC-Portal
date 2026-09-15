@@ -28,6 +28,7 @@ div
     )
     v-spacer
     span.text-caption(v-if='daten') {{ zaehler }}
+    v-btn(variant='text', size='small', prepend-icon='download', :disabled='!gefiltert.length', @click='csv') CSV
     v-btn(variant='tonal', size='small', prepend-icon='label', @click='kategorienDialog?.show()') Kategorien
     v-btn(
       variant='flat',
@@ -128,6 +129,7 @@ import materialKategorien from '../../../../lib/materialKategorien.lib.vue'
 import { useApi } from '../../../../plugins/api'
 import { useDialog } from '../../../../plugins/dialog'
 import filterGenerator from '../../../../util/filter.util'
+import { csvExport, heuteISO, jaNein } from '../../../../util/csv.util'
 import { useMaterialFotos } from '../../../../util/materialFoto.util'
 import type {
   MaterialKategorie,
@@ -183,6 +185,37 @@ const gefiltert = computed(() =>
     )
     .filter(filterGenerator(suche.value))
 )
+
+/** Exportiert die gefilterte Bestandsliste inklusive Pflege-Flags. */
+function csv() {
+  csvExport(
+    `Materialbestand-${heuteISO()}`,
+    [
+      'ID',
+      'Name',
+      'Kategorie',
+      'Bereich',
+      'Bestand',
+      'Lagerort',
+      'Beschreibung',
+      'Freigegeben',
+      'Archiviert',
+      'Foto'
+    ],
+    gefiltert.value.map((m) => [
+      m.materialID,
+      m.name,
+      m.kategorie ?? '',
+      m.bereich === 'referenten' ? 'Referenten' : 'Allgemein',
+      m.bestand,
+      m.lagerort,
+      m.beschreibung,
+      jaNein(m.freigegeben),
+      jaNein(!m.aktiv),
+      jaNein(m.hatFoto)
+    ])
+  )
+}
 
 const zaehler = computed(() => {
   const alle = daten.value ?? []

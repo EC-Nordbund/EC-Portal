@@ -4,6 +4,7 @@ div
     ec-search(label='Antrag suchen', @suche='suche = $event')
     v-spacer
     span.text-caption(v-if='daten') {{ zaehler }}
+    v-btn(variant='text', size='small', prepend-icon='download', :disabled='!gefiltert.length', @click='csv') CSV
     v-btn(icon, variant='text', size='small', :loading='laedt', title='Neu laden', @click='laden')
       v-icon replay
 
@@ -44,6 +45,7 @@ import { computed, ref, watch } from 'vue'
 import { useApi } from '../../../../plugins/api'
 import { useRouter } from '../../../../plugins/router'
 import filterGenerator from '../../../../util/filter.util'
+import { csvExport, heuteISO, jaNein } from '../../../../util/csv.util'
 import {
   STATUS_FARBE,
   STATUS_TEXT,
@@ -89,6 +91,59 @@ const abgewiesen = ref('')
 const gefiltert = computed(() =>
   (daten.value ?? []).filter(filterGenerator(suche.value))
 )
+
+/**
+ * Eine Zeile je Antrag; die Positionen stehen als Text in einer Spalte
+ * („Kubb 2 (genehmigt 1); Pavillon 1“), damit die Liste in Excel eine Zeile
+ * pro Antrag bleibt.
+ */
+function csv() {
+  const positionenText = (a: AntragUebersicht) =>
+    a.positionen
+      .map((p) => {
+        const gen =
+          p.mengeGenehmigt === null || p.mengeGenehmigt === p.menge
+            ? ''
+            : ` (genehmigt ${p.mengeGenehmigt})`
+        return `${p.name} ${p.menge}${gen}`
+      })
+      .join('; ')
+  csvExport(
+    `Materialantraege-${heuteISO()}`,
+    [
+      'Nr',
+      'Status',
+      'Von',
+      'Bis',
+      'Anlass',
+      'EC-Kreis',
+      'Antragsteller/in',
+      'E-Mail',
+      'Positionen',
+      'Anzahl Positionen',
+      'Rückgabe überfällig',
+      'Kommentar',
+      'Antwort',
+      'Gestellt am'
+    ],
+    gefiltert.value.map((a) => [
+      a.materialAntragID,
+      STATUS_TEXT[a.status],
+      a.vonObj?.german ?? a.von,
+      a.bisObj?.german ?? a.bis,
+      a.anlass,
+      a.kreis ?? '',
+      `${a.antragsteller.vorname} ${a.antragsteller.nachname}`,
+      a.antragsteller.email,
+      positionenText(a),
+      a.positionenAnzahl,
+      jaNein(a.ueberfaellig),
+      a.kommentar,
+      a.antwort,
+      new Date(a.erstellt).toLocaleString('de-DE')
+    ])
+  )
+}
 
 const zaehler = computed(() => {
   const alle = daten.value ?? []
