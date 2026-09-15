@@ -232,7 +232,9 @@ ec-wrapper(
               )
                 | Der Browser verkleinert das Bild vor dem Speichern auf höchstens
                 | {{ FOTO_MAX_PX }} px (JPEG). Es liegt dann in den Antworten des Kreises
-                | und kommt per IMAGE-Platzhalter (siehe unten) in die DOCX.
+                | und kommt per IMAGE-Platzhalter (siehe unten) in die DOCX. Den Platzhalter
+                | in einen normalen Absatz oder eine Tabellenzelle ohne feste Höhe setzen,
+                | nicht in ein Textfeld: dort wird das Bild abgeschnitten.
               v-textarea(
                 :label='auswahl.obj.typ === "info" ? "Text" : "Hilfetext"',
                 v-model='auswahl.obj.hilfe',
@@ -580,6 +582,9 @@ ec-wrapper(
                   code.ml-1 {{ hilfe.foto }}
                   | . Ohne Foto bleibt die Stelle leer; wer stattdessen etwas anderes zeigen will:
                   code.ml-1 {{ hilfe.fotoBedingt }}
+                  | . Der Platzhalter gehört in einen normalen Absatz oder eine Tabellenzelle
+                  | ohne feste Zeilenhöhe: in Textfeldern und Zeilen mit fester Höhe wird das
+                  | Bild am Rand abgeschnitten und ist im PDF nicht zu sehen.
                 li
                   | Metadaten:
                   code.ml-1 meta_kreis, meta_datum, meta_stand_version, meta_formular_version, meta_entwurf
