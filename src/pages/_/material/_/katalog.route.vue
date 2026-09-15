@@ -67,17 +67,21 @@ div
     span(v-else) Es ist noch kein Material eingetragen.
 
   v-list(v-if='gefiltert.length', lines='three', border, rounded)
+    //- Klick auf die Zeile oeffnet das Detail (grosses Foto, ganze
+    //- Beschreibung); Haken und Mengenfeld rechts stoppen den Klick.
     v-list-item(
       v-for='m in gefiltert',
       :key='m.materialID',
-      :class='{ "bg-green-lighten-5": auswahl.has(m.materialID) }'
+      :class='{ "bg-green-lighten-5": auswahl.has(m.materialID) }',
+      @click='detailDialog?.show(m)'
     )
       template(#prepend)
         ec-material-foto.mr-3(
           :material-i-d='m.materialID',
           :name='m.name',
           :hat-foto='m.hatFoto',
-          :foto-stand='m.fotoStand'
+          :foto-stand='m.fotoStand',
+          :klickbar='false'
         )
       v-list-item-title
         | {{ m.name }}
@@ -93,7 +97,7 @@ div
             v-chip(v-if='m.angefragt', size='x-small', color='warning', variant='flat')
               | {{ m.angefragt }} angefragt
       template(#append)
-        .d-flex.align-center.ga-2
+        .d-flex.align-center.ga-2(@click.stop)
           v-text-field(
             v-if='auswahl.has(m.materialID)',
             :model-value='auswahl.get(m.materialID)',
@@ -138,6 +142,16 @@ div
       @click='antragDialog.show()'
     ) Antrag stellen
 
+  material-detail(
+    ref='detailDialog',
+    :menge='detailMenge',
+    :max-menge='detailMax',
+    :zeitraum-text='zeitraumText',
+    @auswaehlen='(m) => umschalten(m, true)',
+    @entfernen='(m) => umschalten(m, false)',
+    @menge='mengeSetzen'
+  )
+
   material-antrag(
     v-if='stammdaten && material',
     ref='antragDialog',
@@ -153,6 +167,7 @@ div
 <script setup lang="ts">
 import { computed, reactive, ref, useTemplateRef, watch } from 'vue'
 import materialAntrag from '../../../../lib/materialAntrag.lib.vue'
+import materialDetail from '../../../../lib/materialDetail.lib.vue'
 import { useApi } from '../../../../plugins/api'
 import type { PortalMe } from '../../../../plugins/auth'
 import { useRouter } from '../../../../plugins/router'
@@ -182,6 +197,8 @@ const { materialVon, materialBis } = useStorage()
 const fotos = useMaterialFotos()
 const antragDialog =
   useTemplateRef<InstanceType<typeof materialAntrag>>('antragDialog')
+const detailDialog =
+  useTemplateRef<InstanceType<typeof materialDetail>>('detailDialog')
 
 const heute = new Date().toISOString().slice(0, 10)
 const von = materialVon
@@ -329,6 +346,24 @@ function untertitel(m: Material) {
   if (m.lagerort) teile.push(`Lagerort: ${m.lagerort}`)
   return teile.join(' · ')
 }
+
+/**
+ * Der Detaildialog kennt nur „sein“ Material; Menge und Obergrenze kommen
+ * reaktiv von hier, damit ein Haken im Dialog sofort in der Liste steht und
+ * umgekehrt.
+ */
+const detailMaterial = computed(
+  () => (detailDialog.value as any)?.material as Material | null | undefined
+)
+const detailMenge = computed(() => {
+  const m = detailMaterial.value
+  return m && auswahl.has(m.materialID)
+    ? (auswahl.get(m.materialID) ?? 1)
+    : null
+})
+const detailMax = computed(() =>
+  detailMaterial.value ? maxMenge(detailMaterial.value) : 0
+)
 
 /** Obergrenze fürs Mengenfeld: frei im Zeitraum, sonst der Bestand. */
 function maxMenge(m: Material) {
