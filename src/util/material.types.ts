@@ -66,19 +66,27 @@ export interface AntragPosition {
   name: string
   lagerort: string
   bereich: MaterialBereich
+  kategorie: string | null
   hatFoto: boolean
-  fotoStand: number | null
   menge: number
+  /** null = noch nicht entschieden, 0 = gestrichen */
   mengeGenehmigt: number | null
   eingeladen: boolean
   zurueck: boolean
 }
 
+/**
+ * Antrag (EC-Api src/material/antrag.ts, AntragKopf). `von`/`bis` sind
+ * ISO-Strings, die Anzeigeform steckt in `vonObj`/`bisObj`.
+ */
 export interface Antrag {
   materialAntragID: number
+  portalUserID: number
   status: AntragStatus
-  von: ApiDatum
-  bis: ApiDatum
+  von: string
+  bis: string
+  vonObj: ApiDatum | null
+  bisObj: ApiDatum | null
   veranstaltungsID: number | null
   ecKreisID: number | null
   kreis: string | null
@@ -89,45 +97,49 @@ export interface Antrag {
   geaendert: string
   entschiedenAm: string | null
   abgeschlossenAm: string | null
+  antragsteller: { vorname: string; nachname: string; email: string }
   positionen: AntragPosition[]
 }
 
-/** Ein anderer Antrag, der sich mit einer Position überschneidet. */
+/**
+ * Ein anderer Antrag, der sich mit einer Position überschneidet
+ * (EC-Api src/material/verfuegbarkeit.ts, Konflikt). `von`/`bis` sind
+ * ISO-Strings, die Anzeigeform steckt in `vonObj`/`bisObj`.
+ */
 export interface Konflikt {
+  materialID: number
   materialAntragID: number
   status: AntragStatus
-  von: ApiDatum
-  bis: ApiDatum
+  von: string
+  bis: string
+  vonObj: ApiDatum
+  bisObj: ApiDatum
+  /** genehmigte Menge bei genehmigten, beantragte bei offenen Anträgen */
   menge: number
   anlass: string
   antragsteller: string
 }
 
-/** Detail für Materialwarte: Antragsteller und Konflikte je Position. */
+/** Detail: eigener Antrag oder als Materialwart, dann mit Konflikten je materialID. */
 export interface AntragDetail extends Antrag {
-  antragsteller: { vorname: string; nachname: string; email: string } | null
-  konflikte: Record<number, Konflikt[]> | null
-  ueberbucht: number[] | null
+  eigener: boolean
+  konflikte?: Record<number, Konflikt[]>
 }
 
 /** Zeile in der Antragsliste des Materialwarts. */
-export interface AntragUebersicht {
-  materialAntragID: number
-  status: AntragStatus
-  von: ApiDatum
-  bis: ApiDatum
-  anlass: string
-  antragsteller: string
-  positionen: number
+export interface AntragUebersicht extends Antrag {
   ueberfaellig: boolean
-  erstellt: string
+  positionenAnzahl: number
 }
 
+/** Eine Zeile im Belegungsplan (EC-Api verfuegbarkeit.ts, BelegungMaterial). */
 export interface Reservierung {
   materialAntragID: number
   status: AntragStatus
-  von: ApiDatum
-  bis: ApiDatum
+  von: string
+  bis: string
+  vonObj: ApiDatum
+  bisObj: ApiDatum
   menge: number
   anlass: string
   antragsteller: string
@@ -136,10 +148,15 @@ export interface Reservierung {
 export interface BelegungMaterial {
   materialID: number
   name: string
-  bestand: number
+  bereich: MaterialBereich
   kategorie: string | null
+  bestand: number
+  aktiv: boolean
+  freigegeben: boolean
   reservierungen: Reservierung[]
+  /** Höchste gleichzeitig genehmigte Menge an einem Tag des Fensters. */
   maxBelegt: number
+  ueberbucht: boolean
 }
 
 export interface Belegung {

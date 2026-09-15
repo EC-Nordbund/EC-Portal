@@ -1,6 +1,7 @@
 <template lang="pug">
 //- Vorschau eines Materials, optional mit Klick zum Vollbild.
 v-avatar(
+  v-bind='$attrs',
   :size='size',
   rounded,
   :color='vorschau ? undefined : "grey-lighten-3"',
@@ -38,6 +39,9 @@ import { useMaterialFotos } from '../util/materialFoto.util'
  * Foto wird erst beim Öffnen geholt -- per requestBlob, weil ein <img> den
  * Token nicht mitschickt -- und beim Schließen wieder freigegeben.
  */
+// Zwei Wurzelknoten (Avatar + Dialog): class/style sollen auf den Avatar.
+defineOptions({ inheritAttrs: false })
+
 const props = withDefaults(
   defineProps<{
     materialID: number
