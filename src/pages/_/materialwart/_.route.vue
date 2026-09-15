@@ -23,8 +23,9 @@ import type { PortalMe } from '../../../plugins/auth'
 
 /**
  * Rahmen des Materialwart-Bereichs: Anträge bearbeiten, Bestand pflegen,
- * Belegung ansehen. Eine Rolle, drei Aufgaben -- deshalb immer alle drei
- * Reiter, anders als beim EC-Kreis, wo die Leiste je nach Rolle wegfällt.
+ * Belegung ansehen, Vorlagen pflegen. Eine Rolle, vier Aufgaben -- deshalb
+ * immer alle Reiter, anders als beim EC-Kreis, wo die Leiste je nach Rolle
+ * wegfällt.
  */
 const props = defineProps<{ me: PortalMe }>()
 const emit = defineEmits<{ (e: 'reload'): void }>()
@@ -39,6 +40,7 @@ const untertitel = computed(() => {
 const nav = [
   { icon: 'inbox', label: 'Anträge', to: '/materialwart/antraege' },
   { icon: 'warehouse', label: 'Bestand', to: '/materialwart/bestand' },
-  { icon: 'calendar_month', label: 'Belegung', to: '/materialwart/belegung' }
+  { icon: 'calendar_month', label: 'Belegung', to: '/materialwart/belegung' },
+  { icon: 'bookmarks', label: 'Vorlagen', to: '/materialwart/vorlagen' }
 ]
 </script>

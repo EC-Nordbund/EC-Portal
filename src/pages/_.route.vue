@@ -54,6 +54,10 @@ v-app
           template(#prepend)
             v-icon calendar_month
           v-list-item-title Belegung
+        v-list-item(to='/materialwart/vorlagen')
+          template(#prepend)
+            v-icon bookmarks
+          v-list-item-title Vorlagen
 
       template(v-if='me && me.kreise.length')
         v-divider.my-2

@@ -96,6 +96,11 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
           v-icon calendar_month
         v-list-item-title Belegung
         v-list-item-subtitle Wer hat wann was reserviert
+      v-list-item(@click='navigate({ path: "/materialwart/vorlagen" })')
+        template(#prepend)
+          v-icon bookmarks
+        v-list-item-title Vorlagen
+        v-list-item-subtitle Materiallisten für wiederkehrende Freizeiten
 
   //- Globale Verantwortung: gilt für alle Kreise, hängt also an keinem
   //- Eintrag oben. Ohne eigenen Block fände ein reiner Verwalter den Einstieg

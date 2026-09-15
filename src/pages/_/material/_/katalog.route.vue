@@ -50,6 +50,39 @@ div
       v-chip(value='referenten', size='small', filter) Speziell
     v-spacer
     span.text-caption(v-if='material') {{ zaehler }}
+    //- Vorlagen: fertige Materiallisten (z. B. Teencamp-Grundliste), die der
+    //- Materialwart pflegt. Laden füllt die Auswahl, der Antrag geht dann wie
+    //- gewohnt weiter.
+    v-menu(v-model='vorlagenOffen', :close-on-content-click='true')
+      template(#activator='{ props: menuProps }')
+        v-btn(
+          v-bind='menuProps',
+          variant='text',
+          size='small',
+          prepend-icon='bookmarks',
+          :disabled='!material'
+        ) Vorlagen
+      v-list(density='compact', min-width='280')
+        v-list-subheader Vorlage laden
+        v-list-item(v-if='vorlagenLaedt', disabled)
+          v-list-item-title
+            v-progress-circular(indeterminate, size='16', width='2')
+            span.ml-2 Lade …
+        v-list-item(v-else-if='vorlagen && !vorlagen.length', disabled)
+          v-list-item-title Noch keine Vorlagen
+        v-list-item(
+          v-for='v in vorlagen ?? []',
+          :key='v.materialVorlageID',
+          @click='vorlageAnwenden(v)'
+        )
+          template(#prepend)
+            v-icon bookmark
+          v-list-item-title
+            | {{ v.name }}
+            v-chip.ml-2(v-if='v.bereich === "referenten"', size='x-small', variant='outlined') Speziell
+          v-list-item-subtitle
+            | {{ v.positionen.length }} {{ v.positionen.length === 1 ? 'Position' : 'Positionen' }}
+            span(v-if='v.beschreibung')  · {{ v.beschreibung }}
     v-btn(
       variant='text',
       size='small',
@@ -61,6 +94,17 @@ div
   v-progress-linear(v-if='laedtGerade', indeterminate, color='primary')
 
   v-alert(v-if='abgewiesen', type='info', variant='tonal') {{ abgewiesen }}
+
+  //- Ergebnis des Vorlage-Ladens: was übernommen wurde, was gekürzt und was
+  //- gar nicht ging. Bleibt stehen, bis man es wegklickt -- sonst übersieht
+  //- man, dass der Beamer fehlt.
+  v-alert.mb-4(
+    v-if='vorlageHinweis',
+    type='info',
+    variant='tonal',
+    closable,
+    @click:close='vorlageHinweis = ""'
+  ) {{ vorlageHinweis }}
 
   v-alert.mb-4(v-if='material && !gefiltert.length', type='info', variant='tonal')
     span(v-if='suche || kategorie || bereich !== "alle"') Kein Material passt zu den Filtern.
@@ -175,7 +219,11 @@ import { useStorage } from '../../../../storage'
 import filterGenerator from '../../../../util/filter.util'
 import { csvExport, heuteISO } from '../../../../util/csv.util'
 import { useMaterialFotos } from '../../../../util/materialFoto.util'
-import type { Material, Stammdaten } from '../../../../util/material.types'
+import type {
+  Material,
+  Stammdaten,
+  Vorlage
+} from '../../../../util/material.types'
 
 /**
  * Materialkatalog mit Warenkorb.
@@ -212,6 +260,11 @@ const stammdaten = ref<Stammdaten | null>(null)
 const material = ref<Material[] | null>(null)
 const laedtGerade = ref(false)
 const abgewiesen = ref('')
+
+const vorlagenOffen = ref(false)
+const vorlagen = ref<Vorlage[] | null>(null)
+const vorlagenLaedt = ref(false)
+const vorlageHinweis = ref('')
 
 /** materialID -> Menge */
 const auswahl = reactive(new Map<number, number>())
@@ -379,6 +432,64 @@ function mengeSetzen(m: Material, wert: string | number) {
   const n = Math.floor(Number(wert))
   if (!Number.isFinite(n) || n < 1) return
   auswahl.set(m.materialID, Math.min(n, Math.max(maxMenge(m), 1)))
+}
+
+/** Vorlagen erst beim ersten Öffnen des Menüs holen -- die meisten brauchen sie nie. */
+async function ladeVorlagen() {
+  if (vorlagen.value || vorlagenLaedt.value) return
+  vorlagenLaedt.value = true
+  try {
+    const res = await api.get<{ vorlagen: Vorlage[] }>(
+      '/portal/material/vorlagen',
+      { quiet: true }
+    )
+    vorlagen.value = res.vorlagen
+  } catch {
+    vorlagen.value = []
+  } finally {
+    vorlagenLaedt.value = false
+  }
+}
+watch(vorlagenOffen, (o) => {
+  if (o) ladeVorlagen()
+})
+
+/**
+ * Vorlage in die Auswahl übernehmen. Die Vorlage ist eine Wunschliste, der
+ * Katalog die Wirklichkeit: Mengen werden auf das Freie gekürzt, was im
+ * Zeitraum belegt, archiviert oder für diese Person unsichtbar ist, fällt
+ * weg. Bestehende Auswahl bleibt; gleiche Materialien bekommen die Menge
+ * der Vorlage. Der Hinweis nennt alles, was nicht 1:1 übernommen wurde.
+ */
+function vorlageAnwenden(v: Vorlage) {
+  const liste = material.value ?? []
+  const uebernommen: string[] = []
+  const gekuerzt: string[] = []
+  const belegt: string[] = []
+  const fehlt: string[] = []
+  for (const p of v.positionen) {
+    const m = liste.find((x) => x.materialID === p.materialID)
+    if (!m) {
+      fehlt.push(p.name)
+      continue
+    }
+    const max = maxMenge(m)
+    if (max < 1) {
+      belegt.push(m.name)
+      continue
+    }
+    const menge = Math.min(p.menge, max)
+    auswahl.set(m.materialID, menge)
+    uebernommen.push(m.name)
+    if (menge < p.menge) gekuerzt.push(`${m.name} (${p.menge} → ${menge})`)
+  }
+  const teile = [
+    `Vorlage „${v.name}“: ${uebernommen.length} ${uebernommen.length === 1 ? 'Position' : 'Positionen'} übernommen`
+  ]
+  if (gekuerzt.length) teile.push(`gekürzt: ${gekuerzt.join(', ')}`)
+  if (belegt.length) teile.push(`im Zeitraum belegt: ${belegt.join(', ')}`)
+  if (fehlt.length) teile.push(`nicht verfügbar: ${fehlt.join(', ')}`)
+  vorlageHinweis.value = teile.join(' · ')
 }
 
 async function ladeStammdaten() {

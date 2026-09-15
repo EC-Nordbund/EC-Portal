@@ -165,6 +165,38 @@ export interface Belegung {
   material: BelegungMaterial[]
 }
 
+/** Position einer Materiallisten-Vorlage, wie der Katalog sie bekommt. */
+export interface VorlagePosition {
+  materialID: number
+  name: string
+  menge: number
+}
+
+/**
+ * Materiallisten-Vorlage („Teencamp-Grundliste“). Gepflegt nur von
+ * Materialwarten; `bereich` entscheidet, wer sie im Katalog sieht.
+ */
+export interface Vorlage {
+  materialVorlageID: number
+  name: string
+  beschreibung: string
+  bereich: MaterialBereich
+  sortierung: number
+  positionen: VorlagePosition[]
+}
+
+/** Verwaltungsansicht: Positionen tragen den Materialstatus für den Editor. */
+export interface VorlagePositionVerwaltung extends VorlagePosition {
+  aktiv: boolean
+  freigegeben: boolean
+  bereich: MaterialBereich
+  hatFoto: boolean
+}
+
+export interface VorlageVerwaltung extends Vorlage {
+  positionen: VorlagePositionVerwaltung[]
+}
+
 export const STATUS_TEXT: Record<AntragStatus, string> = {
   offen: 'offen',
   genehmigt: 'genehmigt',
