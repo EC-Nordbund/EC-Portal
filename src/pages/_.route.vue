@@ -23,6 +23,38 @@ v-app
           v-icon folder_shared
         v-list-item-title Downloads
 
+      //- Materialausleihe gibt es fuer jeden Portal-Nutzer -- aber nur, wenn
+      //- die API das Modul kennt (me.material ist sonst null).
+      template(v-if='me && me.material')
+        v-divider.my-2
+        v-list-subheader Material
+        v-list-item(to='/material/katalog')
+          template(#prepend)
+            v-icon inventory_2
+          v-list-item-title Materialkatalog
+        v-list-item(to='/material/antraege')
+          template(#prepend)
+            v-icon assignment
+          v-list-item-title Meine Anträge
+
+      template(v-if='me && me.material && me.user.materialVerwalter')
+        v-divider.my-2
+        v-list-subheader Materialverwaltung
+        v-list-item(to='/materialwart/antraege')
+          template(#prepend)
+            v-icon inbox
+          v-list-item-title Anträge
+          template(#append)
+            v-chip(v-if='me.material.offen', size='x-small', color='#C62828') {{ me.material.offen }}
+        v-list-item(to='/materialwart/bestand')
+          template(#prepend)
+            v-icon warehouse
+          v-list-item-title Bestand
+        v-list-item(to='/materialwart/belegung')
+          template(#prepend)
+            v-icon calendar_month
+          v-list-item-title Belegung
+
       template(v-if='me && me.kreise.length')
         v-divider.my-2
         v-list-subheader Meine EC-Kreise

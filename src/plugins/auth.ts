@@ -16,7 +16,25 @@ export interface PortalMe {
      * sieht die Schutzkonzepte aller EC-Kreise. Superuser haben sie immer.
      */
     schutzkonzeptVerwalter: boolean
+    /**
+     * „Materialwart“: pflegt den Ausleihbestand des Nordbunds, bearbeitet
+     * Ausleih-Anträge und sieht den Belegungsplan. Superuser haben die Rolle
+     * immer. Es gibt bewusst nur diese eine Material-Rolle.
+     */
+    materialVerwalter: boolean
   }
+  /**
+   * Materialausleihe. null, wenn das Material-Schema in der API fehlt -- dann
+   * gibt es den Bereich im Menü gar nicht.
+   *
+   * `referenten`: darf den zweiten Bereich (Drucker, Stifte …) sehen, also
+   * Freizeitleitung mit Umfang 'voll', Materialwarte und Superuser.
+   * `offen`: unbearbeitete Anträge; nur für Materialwarte gefüllt, sonst null.
+   */
+  material: {
+    referenten: boolean
+    offen: number | null
+  } | null
   kreise: Array<{
     ecKreisID: number
     bezeichnung: string

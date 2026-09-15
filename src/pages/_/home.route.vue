@@ -57,6 +57,46 @@ ec-wrapper(title='Übersicht', :subTitle='begruessung')
             :label='v.fzOffen ? `${v.fzOffen} ohne FZ` : "vollständig"'
           )
 
+  //- Materialausleihe: steht jedem offen, der im Portal ist. Der Block hängt
+  //- an keinem Kreis und keiner Freizeit, deshalb ein eigener Einstieg.
+  template(v-if='me.material')
+    h2.text-h6.mb-2(v-font, v-primary) Material
+    v-list.mb-6(lines='two', border, rounded)
+      v-list-item(@click='navigate({ path: "/material/katalog" })')
+        template(#prepend)
+          v-icon inventory_2
+        v-list-item-title Materialkatalog
+        v-list-item-subtitle Material des Nordbunds ansehen und ausleihen
+      v-list-item(@click='navigate({ path: "/material/antraege" })')
+        template(#prepend)
+          v-icon assignment
+        v-list-item-title Meine Anträge
+        v-list-item-subtitle Stand der Anträge und Packlisten
+
+  template(v-if='me.material && me.user.materialVerwalter')
+    h2.text-h6.mb-2(v-font, v-primary) Materialverwaltung
+    v-list.mb-6(lines='two', border, rounded)
+      v-list-item(@click='navigate({ path: "/materialwart/antraege" })')
+        template(#prepend)
+          v-icon inbox
+        v-list-item-title Anträge
+        v-list-item-subtitle Ausleih-Anträge prüfen und entscheiden
+        template(#append)
+          ec-ampel(
+            :farbe='me.material.offen ? "red" : "green"',
+            :label='me.material.offen ? `${me.material.offen} offen` : "nichts offen"'
+          )
+      v-list-item(@click='navigate({ path: "/materialwart/bestand" })')
+        template(#prepend)
+          v-icon warehouse
+        v-list-item-title Bestand
+        v-list-item-subtitle Material, Fotos und Kategorien pflegen
+      v-list-item(@click='navigate({ path: "/materialwart/belegung" })')
+        template(#prepend)
+          v-icon calendar_month
+        v-list-item-title Belegung
+        v-list-item-subtitle Wer hat wann was reserviert
+
   //- Globale Verantwortung: gilt für alle Kreise, hängt also an keinem
   //- Eintrag oben. Ohne eigenen Block fände ein reiner Verwalter den Einstieg
   //- nur im (auf dem Handy eingeklappten) Menü.
@@ -121,6 +161,7 @@ const hatZustaendigkeit = computed(
   () =>
     props.me.kreise.length > 0 ||
     props.me.veranstaltungen.length > 0 ||
-    props.me.user.schutzkonzeptVerwalter
+    props.me.user.schutzkonzeptVerwalter ||
+    !!props.me.material
 )
 </script>

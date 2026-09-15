@@ -14,5 +14,9 @@ import { defineUseFunction } from '../plugins/base'
 export const useStorage = defineUseFunction(() => ({
   authToken: useLocalStorage('ecPortal:authToken', ''),
   email: useLocalStorage('ecPortal:email', ''),
-  dark: useLocalStorage('ecPortal:dark', false)
+  dark: useLocalStorage('ecPortal:dark', false),
+  // Zuletzt gewählter Ausleihzeitraum im Materialkatalog (ISO YYYY-MM-DD).
+  // Wer erst stöbert und später den Antrag stellt, muss ihn nicht neu tippen.
+  materialVon: useLocalStorage('ecPortal:materialVon', ''),
+  materialBis: useLocalStorage('ecPortal:materialBis', '')
 }))
