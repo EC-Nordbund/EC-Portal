@@ -106,9 +106,9 @@ ec-wrapper(
                 .zeile.stufe-2(:class='{ aktiv: auswahlId === f.id }', @click='waehle(f.id)')
                   v-icon.mr-2(size='small') {{ typIcon(f.typ) }}
                   span.flex-grow-1.text-truncate
-                    | {{ f.label || '(ohne Beschriftung)' }}
-                    span.text-error(v-if='f.pflicht && f.typ !== "info"') &nbsp;*
-                  code.text-caption.mr-1(v-if='f.key && f.typ !== "info"') {{ f.key }}
+                    | {{ f.label || (f.typ === 'infotabelle' ? '(Hinweis-Tabelle)' : '(ohne Beschriftung)') }}
+                    span.text-error(v-if='f.pflicht && hatDaten(f.typ)') &nbsp;*
+                  code.text-caption.mr-1(v-if='f.key && hatDaten(f.typ)') {{ f.key }}
                   template(v-if='!readonly')
                     v-btn(icon, size='x-small', variant='text', :disabled='fi === 0', @click.stop='verschiebe(a.felder, fi, -1)')
                       v-icon arrow_upward
@@ -189,7 +189,7 @@ ec-wrapper(
               .text-overline
                 | {{ auswahl.art === 'spalte' ? `Spalte der Tabelle „${auswahl.gruppe?.label}“` : 'Feld' }}
               v-text-field(
-                :label='auswahl.obj.typ === "info" ? "Überschrift" : "Beschriftung / Frage"',
+                :label='auswahl.obj.typ === "info" ? "Überschrift" : auswahl.obj.typ === "infotabelle" ? "Überschrift (optional)" : "Beschriftung / Frage"',
                 v-model='auswahl.obj.label',
                 :readonly='readonly',
                 :rules='[hoechstens(GRENZEN.labelLaenge)]',
@@ -206,7 +206,7 @@ ec-wrapper(
                 :readonly='readonly',
                 @update:model-value='typGewaehlt'
               )
-              template(v-if='auswahl.obj.typ !== "info"')
+              template(v-if='hatDaten(auswahl.obj.typ)')
                 v-text-field(
                   label='Interne Bezeichnung (Platzhalter in der DOCX)',
                   v-model='auswahl.obj.key',
@@ -236,7 +236,7 @@ ec-wrapper(
                 | in einen normalen Absatz oder eine Tabellenzelle ohne feste Höhe setzen,
                 | nicht in ein Textfeld: dort wird das Bild abgeschnitten.
               v-textarea(
-                :label='auswahl.obj.typ === "info" ? "Text" : "Hilfetext"',
+                :label='hilfeLabel(auswahl.obj.typ)',
                 v-model='auswahl.obj.hilfe',
                 :readonly='readonly',
                 :rules='[hoechstens(GRENZEN.hilfeLaenge)]',
@@ -244,6 +244,85 @@ ec-wrapper(
                 rows='2',
                 auto-grow
               )
+
+              //- Hinweis-Tabelle: fester Inhalt, Zelle für Zelle als reiner
+              //- Text. Der Server kürzt auf GRENZEN.hinweis* -- deshalb sperren
+              //- die Knöpfe an der Grenze, statt dass später etwas fehlt.
+              template(v-if='auswahl.obj.typ === "infotabelle" && auswahl.obj.tabelle')
+                .text-subtitle-2.mt-4 Inhalt der Tabelle
+                .text-caption.text-medium-emphasis.mb-1
+                  | Reiner Text je Zelle; Zeilenumbrüche (Enter) bleiben erhalten. Die
+                  | Tabelle steht fest im Formular – der EC-Kreis kann sie nur lesen. Ins
+                  | PDF kommt sie nicht: feste Inhalte gehören dort direkt in die Word-Vorlage.
+                v-checkbox(
+                  label='Erste Zeile ist die Kopfzeile',
+                  v-model='auswahl.obj.tabelle.kopfzeile',
+                  :readonly='readonly',
+                  density='compact',
+                  hide-details
+                )
+                .raster-editor.mt-2(v-if='auswahl.obj.tabelle.zeilen.length')
+                  table
+                    thead(v-if='!readonly')
+                      tr
+                        th
+                        th(v-for='j in hinweisSpalten(auswahl.obj.tabelle)', :key='j')
+                          .d-flex.align-center.justify-center
+                            span.text-caption.text-medium-emphasis Spalte {{ j }}
+                            v-btn(
+                              icon,
+                              size='x-small',
+                              variant='text',
+                              :title='`Spalte ${j} entfernen`',
+                              @click='tabelleSpalteWeg(auswahl.obj, j - 1)'
+                            )
+                              v-icon delete
+                    tbody
+                      tr(
+                        v-for='(zeile, zi) in auswahl.obj.tabelle.zeilen',
+                        :key='zi',
+                        :class='{ kopf: auswahl.obj.tabelle.kopfzeile && zi === 0 }'
+                      )
+                        th.zeilen-knoepfe(v-if='!readonly')
+                          v-btn(icon, size='x-small', variant='text', title='Zeile nach oben', :disabled='zi === 0', @click='verschiebe(auswahl.obj.tabelle.zeilen, zi, -1)')
+                            v-icon arrow_upward
+                          v-btn(icon, size='x-small', variant='text', title='Zeile nach unten', :disabled='zi === auswahl.obj.tabelle.zeilen.length - 1', @click='verschiebe(auswahl.obj.tabelle.zeilen, zi, 1)')
+                            v-icon arrow_downward
+                          v-btn(icon, size='x-small', variant='text', :title='`Zeile ${zi + 1} entfernen`', @click='tabelleZeileWeg(auswahl.obj, zi)')
+                            v-icon delete
+                        td(v-for='(zelle, si) in zeile', :key='si')
+                          v-textarea(
+                            v-model='zeile[si]',
+                            :readonly='readonly',
+                            :rules='[hoechstens(GRENZEN.hinweisZelleLaenge)]',
+                            :aria-label='`Zeile ${zi + 1}, Spalte ${si + 1}`',
+                            :placeholder='auswahl.obj.tabelle.kopfzeile && zi === 0 ? "Kopf" : ""',
+                            variant='outlined',
+                            density='compact',
+                            hide-details='auto',
+                            rows='1',
+                            auto-grow
+                          )
+                .d-flex.align-center.flex-wrap.ga-2.mt-2
+                  template(v-if='!readonly')
+                    v-btn(
+                      size='small',
+                      variant='tonal',
+                      prepend-icon='add',
+                      :disabled='auswahl.obj.tabelle.zeilen.length >= GRENZEN.hinweisZeilen',
+                      @click='tabelleZeileNeu(auswahl.obj)'
+                    ) Zeile
+                    v-btn(
+                      size='small',
+                      variant='tonal',
+                      prepend-icon='add',
+                      :disabled='hinweisSpalten(auswahl.obj.tabelle) >= GRENZEN.hinweisSpalten',
+                      @click='tabelleSpalteNeu(auswahl.obj)'
+                    ) Spalte
+                  span.text-caption.text-medium-emphasis
+                    | {{ auswahl.obj.tabelle.zeilen.length }} Zeilen × {{ hinweisSpalten(auswahl.obj.tabelle) }} Spalten
+                    | (höchstens {{ GRENZEN.hinweisZeilen }} × {{ GRENZEN.hinweisSpalten }},
+                    | {{ GRENZEN.hinweisZelleLaenge }} Zeichen je Zelle)
 
               //- Wertebereich: je Typ andere Grenzen, der Server behält nur
               //- die passenden. Die Kreis-Formulare prüfen dagegen.
@@ -463,7 +542,7 @@ ec-wrapper(
                   @click='neueSpalte(auswahl.obj)'
                 ) Spalte
 
-              template(v-if='auswahl.obj.typ !== "info" && auswahl.obj.key')
+              template(v-if='hatDaten(auswahl.obj.typ) && auswahl.obj.key')
                 .text-subtitle-2.mt-4 Platzhalter
                 .d-flex.flex-wrap.ga-1
                   code.platzhalter(v-for='p in platzhalterFuer(auswahl.obj, auswahl.gruppe)', :key='p') {{ p }}
@@ -585,6 +664,9 @@ ec-wrapper(
                   | . Der Platzhalter gehört in einen normalen Absatz oder eine Tabellenzelle
                   | ohne feste Zeilenhöhe: in Textfeldern und Zeilen mit fester Höhe wird das
                   | Bild am Rand abgeschnitten und ist im PDF nicht zu sehen.
+                li
+                  | Info-Text und Hinweis-Tabelle haben keinen Platzhalter: sie stehen nur
+                  | im Formular. Was fest im PDF stehen soll, gehört direkt in die Vorlage.
                 li
                   | Metadaten:
                   code.ml-1 meta_kreis, meta_datum, meta_stand_version, meta_formular_version, meta_entwurf
@@ -713,8 +795,11 @@ import {
   fortschritt,
   gueltigerDatumAusdruck,
   gueltigesIsoDatum,
+  hatDaten,
   hatOptionen,
   heuteISO,
+  hinweisSpalten,
+  istAnzeige,
   neueId,
   normalisiereDefinition,
   parseRelativDatum,
@@ -729,6 +814,7 @@ import {
   type Erinnerung,
   type Feld,
   type FeldTyp,
+  type HinweisTabelle,
   type Option,
   type Problem,
   type Pruefung,
@@ -871,7 +957,7 @@ const geaendert = computed(
 )
 
 const spaltenTypen = FELD_TYPEN.filter(
-  (t) => t.typ !== 'gruppe' && t.typ !== 'info'
+  (t) => t.typ !== 'gruppe' && !istAnzeige(t.typ)
 )
 
 /* ------------------------------------------------------------- Laden --- */
@@ -1089,10 +1175,68 @@ function leeresFeld(typ: FeldTyp = 'text'): Feld {
     minEintraege: 0,
     maxEintraege: 0,
     eintragLabel: '',
+    tabelle: { kopfzeile: false, zeilen: [] },
     regeln: leereRegeln(),
     erinnerung: leereErinnerung()
   }
 }
+
+/* --- Hinweis-Tabelle (Typ infotabelle): Raster aus reinem Text --- */
+
+/** Startinhalt beim Wechsel auf den Typ: Kopfzeile und eine Zeile, zwei Spalten. */
+function neueHinweisTabelle(): HinweisTabelle {
+  return {
+    kopfzeile: true,
+    zeilen: [
+      ['', ''],
+      ['', '']
+    ]
+  }
+}
+
+const hatText = (zellen: string[]) => zellen.some((c) => (c ?? '').trim())
+
+function tabelleZeileNeu(f: Feld) {
+  const t = f.tabelle
+  if (t.zeilen.length >= GRENZEN.hinweisZeilen) return
+  t.zeilen.push(Array.from({ length: hinweisSpalten(t) || 1 }, () => ''))
+}
+
+function tabelleSpalteNeu(f: Feld) {
+  const t = f.tabelle
+  if (hinweisSpalten(t) >= GRENZEN.hinweisSpalten) return
+  if (t.zeilen.length === 0) t.zeilen.push([''])
+  else t.zeilen.forEach((z) => z.push(''))
+}
+
+function tabelleZeileWeg(f: Feld, i: number) {
+  const t = f.tabelle
+  if (
+    hatText(t.zeilen[i] ?? []) &&
+    !window.confirm(`Zeile ${i + 1} mit ihrem Text wirklich entfernen?`)
+  )
+    return
+  t.zeilen.splice(i, 1)
+}
+
+function tabelleSpalteWeg(f: Feld, j: number) {
+  const t = f.tabelle
+  if (
+    hatText(t.zeilen.map((z) => z[j])) &&
+    !window.confirm(`Spalte ${j + 1} mit ihrem Text wirklich entfernen?`)
+  )
+    return
+  t.zeilen.forEach((z) => z.splice(j, 1))
+  // Ohne Spalten gibt es keine Tabelle mehr -- nicht n leere Zeilen behalten.
+  if (hinweisSpalten(t) === 0) t.zeilen = []
+}
+
+const hilfeLabel = (typ: FeldTyp) =>
+  typ === 'info'
+    ? 'Text'
+    : typ === 'infotabelle'
+      ? 'Erläuterung über der Tabelle (optional)'
+      : 'Hilfetext'
 
 function neuerBereich() {
   const b: Bereich = {
@@ -1162,6 +1306,7 @@ const abgelegt = new Map<
     maxEintraege?: number
     eintragLabel?: string
     pflicht?: boolean
+    tabelle?: HinweisTabelle
     regeln?: Regeln
     erinnerung?: Erinnerung
   }
@@ -1228,7 +1373,14 @@ function typAendern(f: Feld, neu: FeldTyp) {
   if (f.typ === 'date' || !ablage.erinnerung) {
     ablage.erinnerung = { ...f.erinnerung }
   }
-  if (neu === 'info') ablage.pflicht = f.pflicht
+  // Anzeige-Typen haben keine Pflicht. Zwischen den beiden wechseln darf die
+  // gemerkte Pflicht nicht mit `false` überschreiben.
+  if (istAnzeige(neu) && !istAnzeige(f.typ)) ablage.pflicht = f.pflicht
+  // Den Inhalt einer Hinweis-Tabelle verwirft der Server bei jedem anderen Typ.
+  if (f.typ === 'infotabelle') {
+    ablage.tabelle = f.tabelle
+    f.tabelle = { kopfzeile: false, zeilen: [] }
+  }
   abgelegt.set(f.id, ablage)
 
   f.typ = neu
@@ -1267,7 +1419,12 @@ function typAendern(f: Feld, neu: FeldTyp) {
   if (neu === 'date' && ablage.erinnerung) {
     f.erinnerung = { ...ablage.erinnerung }
   }
-  if (neu === 'info') f.pflicht = false
+  if (neu === 'infotabelle') {
+    f.tabelle = ablage.tabelle?.zeilen.length
+      ? ablage.tabelle
+      : neueHinweisTabelle()
+  }
+  if (istAnzeige(neu)) f.pflicht = false
   else if (ablage.pflicht !== undefined) {
     f.pflicht = ablage.pflicht
     ablage.pflicht = undefined
@@ -1508,6 +1665,7 @@ const typIcon = (typ: FeldTyp) =>
     multiselect: 'checklist',
     checkbox: 'check_box',
     info: 'info',
+    infotabelle: 'grid_on',
     foto: 'photo_camera',
     gruppe: 'table_chart'
   })[typ]
@@ -1544,7 +1702,7 @@ const bekannteSchluessel = computed(() => {
   for (const b of def.value?.bereiche ?? []) {
     for (const a of b.abschnitte) {
       for (const f of a.felder) {
-        if (f.typ === 'info' || !f.key) continue
+        if (!hatDaten(f.typ) || !f.key) continue
         s.add(f.key)
         if (f.typ === 'foto') s.add(`${f.key}_extension`)
         for (const o of f.optionen) s.add(`${f.key}_${o.key}`)
@@ -1559,7 +1717,7 @@ const allePlatzhalter = computed(() => {
   for (const b of def.value?.bereiche ?? []) {
     for (const a of b.abschnitte) {
       for (const f of a.felder) {
-        if (f.typ === 'info' || !f.key) continue
+        if (!hatDaten(f.typ) || !f.key) continue
         const typ = FELD_TYPEN.find((t) => t.typ === f.typ)?.label ?? f.typ
         out.push({ name: f.key, herkunft: `${b.titel} › ${f.label} (${typ})` })
         if (f.typ === 'foto') {
@@ -1658,7 +1816,7 @@ const grenzVerstoesse = computed<Problem[]>(() => {
       zuLang(`${name}: Beschriftung`, GRENZEN.labelLaenge, wo)
     if (lang(f.hilfe, GRENZEN.hilfeLaenge))
       zuLang(
-        `${name}: ${f.typ === 'info' ? 'Text' : 'Hilfetext'}`,
+        `${name}: ${hilfeLabel(f.typ).replace(' (optional)', '')}`,
         GRENZEN.hilfeLaenge,
         wo
       )
@@ -1698,6 +1856,21 @@ const grenzVerstoesse = computed<Problem[]>(() => {
           ...wo,
           text: `${name}: höchstens ${GRENZEN.maxSpalten} Spalten.`
         })
+    }
+    if (f.typ === 'infotabelle') {
+      const zeilen = f.tabelle?.zeilen ?? []
+      if (
+        zeilen.length > GRENZEN.hinweisZeilen ||
+        hinweisSpalten(f.tabelle) > GRENZEN.hinweisSpalten
+      )
+        out.push({
+          ...wo,
+          text: `${name}: höchstens ${GRENZEN.hinweisZeilen} Zeilen und ${GRENZEN.hinweisSpalten} Spalten.`
+        })
+      if (
+        zeilen.some((z) => z.some((c) => lang(c, GRENZEN.hinweisZelleLaenge)))
+      )
+        zuLang(`${name}: Tabellenzelle`, GRENZEN.hinweisZelleLaenge, wo)
     }
     if (
       lang(f.regeln.minDatum, GRENZEN.regelAusdruckLaenge) ||
@@ -2114,6 +2287,38 @@ onBeforeUnmount(() =>
 }
 .stufe-3 {
   padding-left: 68px;
+}
+/* Raster-Editor der Hinweis-Tabelle: breite Tabellen scrollen waagerecht. */
+.raster-editor {
+  overflow-x: auto;
+}
+.raster-editor table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.raster-editor td {
+  min-width: 130px;
+  padding: 3px;
+  vertical-align: top;
+}
+.raster-editor th {
+  font-weight: normal;
+}
+.raster-editor .zeilen-knoepfe {
+  white-space: nowrap;
+  width: 1%;
+  vertical-align: middle;
+}
+.raster-editor tr.kopf td {
+  background: rgba(128, 128, 128, 0.15);
+}
+.raster-editor tr.kopf :deep(textarea) {
+  font-weight: 600;
+}
+/* Schmale Zellen: etwas kleinere Schrift, damit Wörter seltener umbrechen. */
+.raster-editor :deep(.v-field__input) {
+  font-size: 0.875rem;
+  padding-inline: 8px;
 }
 .platzhalter {
   background: rgba(128, 128, 128, 0.12);
